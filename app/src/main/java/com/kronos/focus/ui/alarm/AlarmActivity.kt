@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.kronos.focus.data.CalendarReader
 import com.kronos.focus.ui.TimeField
 import com.kronos.focus.ui.components.*
 import com.kronos.focus.ui.theme.KronosTheme
@@ -64,6 +65,8 @@ import kotlinx.coroutines.delay
 class AlarmActivity : ComponentActivity() {
     private lateinit var store: AlarmStateStore
     private var camGranted by mutableStateOf(false)
+    private var calGranted by mutableStateOf(false)
+    private val calLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { calGranted = it }
     private val camLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { camGranted = it }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -78,6 +81,7 @@ class AlarmActivity : ComponentActivity() {
             override fun handleOnBackPressed() {}
         })
         camGranted = checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        calGranted = CalendarReader.hasPermission(this)
         if (!camGranted) camLauncher.launch(Manifest.permission.CAMERA)
         setContent { KronosTheme { Content() } }
     }
@@ -88,9 +92,11 @@ class AlarmActivity : ComponentActivity() {
         var remaining by remember { mutableLongStateOf(0L) }
         var muteLeft by remember { mutableLongStateOf(0L) }
         var ritualLeft by remember { mutableLongStateOf(0L) }
+        var note by remember { mutableStateOf("") }
         LaunchedEffect(Unit) {
             while (true) {
                 phase = store.phase
+                note = store.ringNote
                 ritualLeft = ((store.ritualDeadlineMs - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
                 muteLeft = ((store.muteUntilMs - System.currentTimeMillis() + 999) / 1000).coerceAtLeast(0)
                 remaining = ((store.checkDeadlineMs - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
@@ -110,6 +116,7 @@ class AlarmActivity : ComponentActivity() {
                 Text("Si no respondes, la alarma vuelve a sonar.", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f))
             } else {
                 Text("¡Despierta!", style = MaterialTheme.typography.headlineLarge, color = Color.White)
+                if (note.isNotBlank()) Text(note, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f))
                 Text(
                     "Levántate y escanea el código del baño o la cocina, o acerca la etiqueta NFC.",
                     style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.92f),
@@ -165,6 +172,8 @@ class AlarmActivity : ComponentActivity() {
         var start by remember { mutableStateOf<Int?>(null) }
         var end by remember { mutableStateOf<Int?>(null) }
         var error by remember { mutableStateOf<String?>(null) }
+        var warn by remember { mutableStateOf<String?>(null) }
+        val events = remember(calGranted) { CalendarReader.eventsForDay(this@AlarmActivity) }
         val fmt = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
         Column(
             Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
@@ -175,6 +184,24 @@ class AlarmActivity : ComponentActivity() {
             Text("Compromiso diario", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onBackground)
             StatusPill("Te quedan ${secondsLeft / 60}:${"%02d".format(secondsLeft % 60)}", if (secondsLeft < 120) Tone.WARN else Tone.INFO)
             MutedText("Elige tus tareas del día. Las que tienen hora activan el Modo Búnker solas; las que no, las inicias tú. Si se acaba el tiempo, vuelve la alarma.")
+
+            if (calGranted) {
+                AppCard {
+                    SectionTitle("Tu calendario de hoy", "Para que veas si tienes reuniones antes de planear.")
+                    if (events.isEmpty()) MutedText("Sin eventos hoy.")
+                    events.forEach { ev ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(ev.title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                            MutedText(if (ev.allDay) "Todo el día" else "${fmt.format(Date(ev.startMs))} – ${fmt.format(Date(ev.endMs))}")
+                        }
+                    }
+                }
+            } else {
+                AppCard {
+                    SectionTitle("Calendario", "Permítelo para ver tus reuniones aquí.")
+                    SoftButton("Permitir calendario", { calLauncher.launch(Manifest.permission.READ_CALENDAR) }, Modifier.fillMaxWidth())
+                }
+            }
 
             AppCard {
                 SectionTitle("Tu día")
@@ -255,12 +282,16 @@ class AlarmActivity : ComponentActivity() {
                         s == null || e == null -> error = "Pon inicio y fin, o deja ambos sin hora."
                         e <= s -> error = "El fin debe ser posterior al inicio."
                         else -> {
-                            blocks.add(AgendaBlock(name.trim(), AgendaValidator.todayAt(s), AgendaValidator.todayAt(e)))
+                            val b = AgendaBlock(name.trim(), AgendaValidator.todayAt(s), AgendaValidator.todayAt(e))
+                            val clash = CalendarReader.conflicts(events, b.startMs, b.endMs).firstOrNull()
+                            warn = clash?.let { "Ojo: choca con “${it.title}” (${fmt.format(Date(it.startMs))} – ${fmt.format(Date(it.endMs))})." }
+                            blocks.add(b)
                             name = ""; start = null; end = null; error = null
                         }
                     }
                 }, Modifier.fillMaxWidth())
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
+                warn?.let { StatusPill(it, Tone.WARN) }
             }
 
             CtaButton(

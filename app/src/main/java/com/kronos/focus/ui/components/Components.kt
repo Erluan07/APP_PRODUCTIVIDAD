@@ -44,19 +44,30 @@ fun HeroCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() 
     }
 }
 
+/** Pantalla sin título arriba: contenido que se desplaza + botón flotante opcional abajo a la derecha. */
 @Composable
-fun ScreenScaffold(title: String, subtitle: String? = null, content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Column {
-            Text(title, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onBackground)
-            subtitle?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+fun ScreenScaffold(fab: (@Composable () -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
+    Box(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            content()
+            Spacer(Modifier.height(88.dp)) // espacio para que el botón flotante no tape el final
         }
-        content()
-        Spacer(Modifier.height(8.dp))
+        fab?.let { Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) { it() } }
     }
+}
+
+/** Botón flotante extendido (acción principal de la pantalla). */
+@Composable
+fun AddFab(text: String, icon: ImageVector, onClick: () -> Unit) {
+    val k = Kronos.colors
+    ExtendedFloatingActionButton(
+        onClick = onClick, containerColor = k.cta, contentColor = k.onCta, shape = MaterialTheme.shapes.large,
+        icon = { Icon(icon, contentDescription = null) },
+        text = { Text(text, style = MaterialTheme.typography.labelLarge) },
+    )
 }
 
 @Composable

@@ -43,7 +43,7 @@ private fun CheckRow(title: String, ok: Boolean, detail: String, actionLabel: St
 }
 
 @Composable
-fun SystemScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
+fun SystemSection(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
     val store = BunkerStateStore.get(ctx)
     val camOk = ctx.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
     val fsOk = Build.VERSION.SDK_INT < 34 || ctx.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
@@ -52,13 +52,14 @@ fun SystemScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
     val owner = DeviceOwnerHardening.isOwner(ctx)
     val pkgUri = Uri.parse("package:${ctx.packageName}")
 
-    ScreenScaffold("Sistema", "Permisos y protecciones")  {
+    ScreenScaffold {
         AppCard {
             SectionTitle("Permisos", "Kronos necesita esto para bloquear, despertarte y tomar fotos.")
             CheckRow("Servicio de bloqueo", a11y, if (a11y) "Activo" else "Apagado", "Activar") {
                 ctx.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             }
             CheckRow("Cámara", camOk, "Para escanear el QR y las fotos de evidencia", "Permitir") { actions.requestCamera() }
+            CheckRow("Calendario", com.kronos.focus.data.CalendarReader.hasPermission(ctx), "Para ver tus reuniones junto a tus tareas", "Permitir") { actions.requestCalendar() }
             CheckRow("Alarma en pantalla completa", fsOk, "Para que la alarma aparezca con la pantalla bloqueada", "Permitir") {
                 if (Build.VERSION.SDK_INT >= 34) ctx.startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, pkgUri))
             }
@@ -70,6 +71,13 @@ fun SystemScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
                 if (heal) "Si apagan el servicio, Kronos lo reactiva" else "Desde el PC: adb shell pm grant com.kronos.focus android.permission.WRITE_SECURE_SETTINGS",
             )
             CheckRow("Device Owner (opcional)", owner, if (owner) "App no desinstalable durante el búnker" else "Avanzado: ver docs/DEVICE_OWNER.md")
+        }
+
+        if (Build.MANUFACTURER.equals("samsung", ignoreCase = true)) {
+            AppCard {
+                SectionTitle("Samsung: que no cierre Kronos", "Samsung suspende apps en segundo plano y puede apagar la alarma.")
+                MutedText("Ajustes > Batería > Límites de uso en segundo plano: quita Kronos Focus de “Apps en suspensión” y “Apps en suspensión profunda”, y añádela a “Apps que nunca se suspenden”.")
+            }
         }
 
         AppCard {

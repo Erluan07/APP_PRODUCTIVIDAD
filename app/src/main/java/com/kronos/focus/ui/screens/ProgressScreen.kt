@@ -45,7 +45,7 @@ private fun DayDot(letter: String, state: Int) {
 }
 
 @Composable
-fun ProgressScreen(ctx: Context, now: Long) {
+fun ProgressSection(ctx: Context, now: Long) {
     val today = AlarmScheduler.epochDay()
     val days = remember(now / 10_000) { StatsStore.get(ctx).all() }
     val sleep = SleepLogStore.get(ctx)
@@ -57,7 +57,7 @@ fun ProgressScreen(ctx: Context, now: Long) {
     val recent = remember(now / 10_000) { proofs.recent(5) }
     val letters = "LMXJVSD"
 
-    ScreenScaffold("Progreso", "Tus rachas y tu sueño") {
+    ScreenScaffold {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             StatTile("Racha actual", "${StreakCalc.current(days, today)} días", Modifier.weight(1f))
             StatTile("Mejor racha", "${StreakCalc.best(days)} días", Modifier.weight(1f))

@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
@@ -31,6 +30,7 @@ class AppActions(
     val startSleep: () -> Unit,
     val openProof: (String, String) -> Unit,
     val requestCamera: () -> Unit,
+    val requestCalendar: () -> Unit,
 )
 
 private data class Tab(val label: String, val icon: ImageVector)
@@ -53,8 +53,8 @@ fun AppRoot(actions: AppActions) {
         }
     }
     val tabs = listOf(
-        Tab("Hoy", Icons.Filled.Home), Tab("Dormir", Icons.Filled.Notifications), Tab("Tareas", Icons.Filled.CheckCircle),
-        Tab("Progreso", Icons.Filled.DateRange), Tab("Sistema", Icons.Filled.Settings),
+        Tab("Hoy", Icons.Filled.Home), Tab("Alarmas", Icons.Filled.Notifications),
+        Tab("Tareas", Icons.Filled.CheckCircle), Tab("Más", Icons.Filled.Settings),
     )
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -73,10 +73,9 @@ fun AppRoot(actions: AppActions) {
         Box(Modifier.padding(pad).statusBarsPadding()) {
             when (tab) {
                 0 -> TodayScreen(ctx, now, a11y, actions)
-                1 -> SleepScreen(ctx, now, actions)
+                1 -> AlarmsScreen(ctx, now, actions)
                 2 -> TasksScreen(ctx, now, actions)
-                3 -> ProgressScreen(ctx, now)
-                else -> SystemScreen(ctx, now, a11y, actions)
+                else -> MoreScreen(ctx, now, a11y, actions)
             }
         }
     }

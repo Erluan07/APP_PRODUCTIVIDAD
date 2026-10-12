@@ -29,6 +29,7 @@ class MainActivity : ComponentActivity() {
         SleepTrackService.start(this, fromUser = true) // con o sin micrófono: sin permiso usa solo movimiento
     }
     private val camLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    private val calLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
     private val notifLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     private fun importText(raw: String) {
@@ -59,6 +60,7 @@ class MainActivity : ComponentActivity() {
             startSleep = { startSleepTracking() },
             openProof = { task, kind -> startActivity(ProofActivity.intent(this, task, kind)) },
             requestCamera = { camLauncher.launch(Manifest.permission.CAMERA) },
+            requestCalendar = { calLauncher.launch(Manifest.permission.READ_CALENDAR) },
         )
         setContent { KronosTheme { AppRoot(actions) } }
     }
