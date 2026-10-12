@@ -91,7 +91,7 @@ fun AlarmsCard(ctx: Context, now: Long) {
             TimeField("Hora", time, { if (it != null) time = it }, Modifier.fillMaxWidth())
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 listOf("L", "M", "X", "J", "V", "S", "D").forEachIndexed { i, l ->
-                    DayToggle(l, (days shr i) and 1 == 1, { days = days xor (1 shl i) }, Modifier.weight(1f))
+                    DayToggle(l, ((days shr i) and 1) == 1, { days = days xor (1 shl i) }, Modifier.weight(1f))
                 }
             }
             OutlinedTextField(

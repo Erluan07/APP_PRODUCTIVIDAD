@@ -22,7 +22,7 @@ object AlarmTimes {
         days == 0b0011111 -> "Lunes a viernes"
         days == 0b1100000 -> "Fin de semana"
         days == 0 -> "Ningún día"
-        else -> NAMES.filterIndexed { i, _ -> (days shr i) and 1 == 1 }.joinToString(" ")
+        else -> NAMES.filterIndexed { i, _ -> ((days shr i) and 1) == 1 }.joinToString(" ")
     }
 
     data class Occurrence(val alarm: AlarmEntry, val epochDay: Long, val timeMs: Long) {
