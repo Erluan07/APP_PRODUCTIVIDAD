@@ -11,7 +11,7 @@ import org.json.JSONObject
 class AlarmConfigStore private constructor(private val prefs: SharedPreferences) {
 
     fun all(): List<AlarmEntry> {
-        if (!prefs.contains(KEY)) { save(listOf(AlarmEntry(1, 7, 0, AlarmTimes.ALL_DAYS, true, "Despertar"))) }
+        if (!prefs.contains(KEY)) { save(listOf(AlarmEntry(1, 7, 0, AlarmTimes.ALL_DAYS, true, "Predeterminada"))) }
         return runCatching {
             val arr = JSONArray(prefs.getString(KEY, "[]"))
             (0 until arr.length()).map {

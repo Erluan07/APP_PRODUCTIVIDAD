@@ -34,6 +34,11 @@ class AlarmStateStore private constructor(private val prefs: SharedPreferences) 
         get() = prefs.getInt("mute_uses", 0)
         set(v) { prefs.edit().putInt("mute_uses", v).apply() }
 
+    /** Texto para la pantalla de alarma (p. ej. "Adelantada 20 min: alarma de las 07:00"). */
+    var ringNote: String
+        get() = prefs.getString("ring_note", "") ?: ""
+        set(v) { prefs.edit().putString("ring_note", v).apply() }
+
     /** Última ocurrencia (alarma + día) que ya sonó, para no repetirla. */
     var lastRingStamp: String?
         get() = prefs.getString("last_ring_stamp", null)

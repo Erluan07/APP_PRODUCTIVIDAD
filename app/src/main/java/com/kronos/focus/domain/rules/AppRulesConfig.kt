@@ -99,6 +99,14 @@ object AppRulesConfig {
     const val SMART_MOVE_DELTA = 0.15f
     const val SMART_MOVE_COUNT = 4
 
+    // ---- Anti-recaída tras despertar ----
+    /** Minutos que se vigila después de confirmar "estoy despierto". */
+    const val AWAKE_WATCH_MIN = 60L
+    /** Minutos sin usar ni mover el teléfono para considerar que te volviste a dormir y volver a sonar. */
+    const val AWAKE_IDLE_MIN = 10L
+    const val AWAKE_MOVE_DELTA = 0.6f
+    const val AWAKE_MOVE_COUNT = 8
+
     // ---- Device Owner (Fase 5, opcional). Ver docs/DEVICE_OWNER.md ----
     /** Oculta la barra de estado/ajustes rápidos durante el búnker (solo si la app es Device Owner). */
     const val DEVICE_OWNER_DISABLE_STATUS_BAR = true

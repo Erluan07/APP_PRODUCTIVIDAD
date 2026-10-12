@@ -29,6 +29,13 @@ object AlarmFlow {
             BunkerStateStore.get(ctx).endSleep()
             s.lastRingStamp = key
             s.lastRingDay = AlarmScheduler.epochDay()
+            AwakeWatchService.stop(ctx)
+            val hm = occ?.alarm?.hm()
+            s.ringNote = when {
+                hm == null -> ""
+                smart && early > 0 -> "Te desperté $early min antes de tu alarma de las $hm porque estabas en sueño ligero."
+                else -> "Alarma de las $hm."
+            }
             AlarmScheduler.cancelRing(ctx)
             resetMute(s)
             s.phase = AlarmPhase.RINGING
@@ -106,6 +113,17 @@ object AlarmFlow {
         val s = AlarmStateStore.get(ctx)
         if (s.phase != AlarmPhase.CHECK_ACTIVE) return
         s.phase = AlarmPhase.IDLE
+        AlarmService.sync(ctx)
+        AwakeWatchService.start(ctx) // vigila que no te vuelvas a dormir
+    }
+
+    /** Te quedaste sin usar el teléfono tras decir "estoy despierto": suena otra vez de inmediato. */
+    fun relapse(ctx: Context) {
+        val s = AlarmStateStore.get(ctx)
+        if (s.phase != AlarmPhase.IDLE) return
+        resetMute(s)
+        s.ringNote = "Parece que te volviste a dormir: no usaste ni moviste el teléfono en ${AppRulesConfig.AWAKE_IDLE_MIN} min."
+        s.phase = AlarmPhase.RINGING
         AlarmService.sync(ctx)
     }
 
