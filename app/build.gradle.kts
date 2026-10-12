@@ -2,7 +2,6 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
-    id("com.google.devtools.ksp")
 }
 
 android {
@@ -29,15 +28,6 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.core:core-ktx:1.15.0")
-    // Fase 2
-    implementation("com.google.mlkit:barcode-scanning:17.3.0") // modelo empaquetado: 100% offline
-    // Fase 4
-    val camerax = "1.4.0"
-    implementation("androidx.camera:camera-camera2:$camerax")
-    implementation("androidx.camera:camera-lifecycle:$camerax")
-    implementation("androidx.camera:camera-view:$camerax")
-    val room = "2.6.1"
-    implementation("androidx.room:room-runtime:$room")
-    implementation("androidx.room:room-ktx:$room")
-    ksp("androidx.room:room-compiler:$room")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+    // Fases 2-4 (se añaden al implementarlas): ML Kit barcode, CameraX, Room + KSP
 }
