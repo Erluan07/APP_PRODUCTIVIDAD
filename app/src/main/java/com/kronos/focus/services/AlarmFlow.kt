@@ -56,11 +56,11 @@ object AlarmFlow {
     }
 
     /** Misión 2: valida y fija la agenda del día; programa el búnker y el Wake-Up Check. Devuelve un error o null. */
-    fun commitAgenda(ctx: Context, blocks: List<AgendaBlock>): String? {
+    fun commitAgenda(ctx: Context, blocks: List<AgendaBlock>, flexNames: List<String> = emptyList()): String? {
         val s = AlarmStateStore.get(ctx)
         if (s.phase != AlarmPhase.RITUAL) return "No hay un ritual activo."
-        AgendaValidator.validate(blocks, System.currentTimeMillis())?.let { return it }
-        AgendaStore.get(ctx).commit(blocks, AlarmScheduler.epochDay())
+        AgendaValidator.validate(blocks, System.currentTimeMillis(), flexNames.size)?.let { return it }
+        AgendaStore.get(ctx).commit(blocks, flexNames, AlarmScheduler.epochDay())
         AlarmScheduler.scheduleBlocks(ctx)
         if (BunkerStateStore.get(ctx).isActive()) BunkerWatchdogService.start(ctx)
         toCheckWait(ctx, s)

@@ -37,5 +37,6 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$camerax")
     implementation("androidx.camera:camera-view:$camerax")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20231013")
     // Fase 4 (pendiente): Room + KSP
 }

@@ -5,6 +5,10 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.content.ClipboardManager
+import android.widget.Toast
+import com.kronos.focus.data.TemplateStore
+import com.kronos.focus.domain.agenda.TaskImport
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
@@ -39,6 +43,24 @@ import java.util.Locale
  * de prueba de duración fija. En builds DEBUG existe además una salida de emergencia para pruebas.
  */
 class MainActivity : ComponentActivity() {
+    private val importLauncher = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { u ->
+            runCatching { contentResolver.openInputStream(u)?.bufferedReader()?.use { it.readText() } }.getOrNull()
+                ?.let { importText(it) } ?: Toast.makeText(this, "No pude leer el archivo", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun importText(raw: String) {
+        val names = TaskImport.parse(raw)
+        val added = TemplateStore.get(this).importNames(names)
+        Toast.makeText(this, "Importadas $added de ${names.size} tareas", Toast.LENGTH_LONG).show()
+    }
+
+    private fun pasteTasks() {
+        val clip = getSystemService(ClipboardManager::class.java).primaryClip
+        importText(clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)?.toString().orEmpty())
+    }
+
     private val camLauncher = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {}
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -105,6 +127,16 @@ class MainActivity : ComponentActivity() {
                 val state = when { now >= it.endMs -> "✔"; now >= it.startMs -> "▶ búnker"; else -> "⏳" }
                 Text("${agendaFmt.format(Date(it.startMs))}–${agendaFmt.format(Date(it.endMs))}  ${it.name}  $state", style = MaterialTheme.typography.bodySmall)
             }
+            HorizontalDivider()
+            TasksSection(
+                ctx = this@MainActivity, now = now, bunkerActive = store.isActive(now),
+                onImportFile = { importLauncher.launch(arrayOf("*/*")) },
+                onPaste = { pasteTasks() },
+                onStartTask = { min ->
+                    store.startSession(min)
+                    BunkerWatchdogService.start(this@MainActivity)
+                },
+            )
             HorizontalDivider()
             Text("Alarma %02d:%02d (ventana Smart Wake-Up: %d min)".format(AppRulesConfig.ALARM_HOUR, AppRulesConfig.ALARM_MINUTE, AppRulesConfig.SMART_WAKE_WINDOW_MIN),
                 style = MaterialTheme.typography.titleSmall)

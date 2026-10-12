@@ -30,8 +30,8 @@ object AgendaValidator {
     }
 
     /** Devuelve un mensaje de error o null si la agenda es válida. */
-    fun validate(blocks: List<AgendaBlock>, now: Long): String? {
-        if (blocks.size < AppRulesConfig.AGENDA_MIN_BLOCKS) return "Agrega al menos ${AppRulesConfig.AGENDA_MIN_BLOCKS} bloque."
+    fun validate(blocks: List<AgendaBlock>, now: Long, flexCount: Int = 0): String? {
+        if (blocks.size + flexCount < AppRulesConfig.AGENDA_MIN_BLOCKS) return "Agrega al menos una tarea (con o sin hora)."
         val sorted = blocks.sortedBy { it.startMs }
         var total = 0L
         for ((i, b) in sorted.withIndex()) {

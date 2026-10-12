@@ -2,6 +2,7 @@ package com.kronos.focus
 
 import com.kronos.focus.domain.agenda.AgendaBlock
 import com.kronos.focus.domain.agenda.AgendaValidator
+import com.kronos.focus.domain.agenda.TaskImport
 import com.kronos.focus.domain.rules.AppRulesConfig
 import com.kronos.focus.services.AlarmScheduler
 import org.junit.Assert.*
@@ -63,5 +64,18 @@ class RulesTest {
         assertEquals(seven, AlarmScheduler.nextDeadline(cal(AppRulesConfig.ALARM_HOUR - 1), false))
         assertEquals(seven + 86_400_000L, AlarmScheduler.nextDeadline(cal(AppRulesConfig.ALARM_HOUR + 1), false))
         assertEquals(seven + 86_400_000L, AlarmScheduler.nextDeadline(cal(AppRulesConfig.ALARM_HOUR - 1), true))
+    }
+
+    @Test fun flexibleOnlyAgendaIsValid() {
+        assertNull(AgendaValidator.validate(emptyList(), base, flexCount = 1))
+        assertNotNull(AgendaValidator.validate(emptyList(), base, flexCount = 0))
+    }
+
+    @Test fun importFromJsonAndText() {
+        assertEquals(listOf("Informe", "Gym"), TaskImport.parse("""["Informe","Gym","informe"]"""))
+        assertEquals(listOf("A", "B"), TaskImport.parse("""[{"title":"A"},{"name":"B","done":false},{"title":"C","completed":true}]"""))
+        assertEquals(listOf("X", "Y"), TaskImport.parse("""{"tasks":[{"titulo":"X"},{"nombre":"Y"}]}"""))
+        assertEquals(listOf("Lavar platos", "Ir al gym", "Llamar"), TaskImport.parse("- Lavar platos\n* Ir al gym\n1. Llamar\n- [x] Hecha\n\n"))
+        assertTrue(TaskImport.parse("").isEmpty())
     }
 }

@@ -40,6 +40,7 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import com.kronos.focus.data.AlarmPhase
 import com.kronos.focus.data.AlarmStateStore
+import com.kronos.focus.data.TemplateStore
 import com.kronos.focus.domain.rules.AppRulesConfig
 import com.kronos.focus.services.AlarmFlow
 import kotlinx.coroutines.delay
@@ -115,6 +116,8 @@ class AlarmActivity : ComponentActivity() {
     @Composable
     private fun Ritual(secondsLeft: Long) {
         val blocks = remember { mutableStateListOf<AgendaBlock>() }
+        val flex = remember { mutableStateListOf<String>() }
+        val templates = remember { TemplateStore.get(this@AlarmActivity).all() }
         var name by remember { mutableStateOf("") }
         var start by remember { mutableStateOf("") }
         var end by remember { mutableStateOf("") }
@@ -123,12 +126,32 @@ class AlarmActivity : ComponentActivity() {
         Column(Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("COMPROMISO DIARIO", style = MaterialTheme.typography.headlineMedium)
-            Text("Escribe los bloques de tu día. Cada uno activará el Modo Búnker. " +
+            Text("Elige tus tareas del día. Las que tienen hora activan el Modo Búnker solas; las que no, las inicias tú. " +
                 "Te quedan ${secondsLeft / 60}:${"%02d".format(secondsLeft % 60)} o vuelve la alarma.")
             blocks.sortedBy { it.startMs }.forEach { b ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("${fmt.format(Date(b.startMs))}–${fmt.format(Date(b.endMs))}  ${b.name}")
                     TextButton(onClick = { blocks.remove(b) }) { Text("Quitar") }
+                }
+            }
+            flex.toList().forEach { n ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Sin hora: $n")
+                    TextButton(onClick = { flex.remove(n) }) { Text("Quitar") }
+                }
+            }
+            if (templates.isNotEmpty()) {
+                Text("Mis tareas (toca Usar y ajusta la hora):", style = MaterialTheme.typography.titleSmall)
+                templates.forEach { t ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(t.label(), modifier = Modifier.weight(1f))
+                        TextButton(onClick = {
+                            name = t.name
+                            start = t.startMin?.let { "%02d%02d".format(it / 60, it % 60) } ?: ""
+                            end = t.endMin?.let { "%02d%02d".format(it / 60, it % 60) } ?: ""
+                            error = null
+                        }) { Text("Usar") }
+                    }
                 }
             }
             OutlinedTextField(name, { name = it }, label = { Text("Tarea (ej. Estudiar)") }, modifier = Modifier.fillMaxWidth())
@@ -138,23 +161,28 @@ class AlarmActivity : ComponentActivity() {
                 OutlinedTextField(end, { end = it }, label = { Text("Fin (1000)") }, modifier = Modifier.weight(1f),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
             }
+            Text("Deja inicio y fin vacíos si no sabes cuándo la harás.", style = MaterialTheme.typography.bodySmall)
             Button(onClick = {
                 val s = AgendaValidator.parseHm(start)
                 val e = AgendaValidator.parseHm(end)
                 when {
                     name.isBlank() -> error = "Escribe el nombre de la tarea."
-                    s == null || e == null -> error = "Hora inválida. Usa formato 24 h, ej. 0800 o 16:30."
+                    start.isBlank() && end.isBlank() -> {
+                        if (name.trim() !in flex) flex.add(name.trim())
+                        name = ""; error = null
+                    }
+                    s == null || e == null -> error = "Pon inicio y fin válidos (24 h, ej. 0800 o 16:30), o deja ambos vacíos."
                     e <= s -> error = "El fin debe ser posterior al inicio."
                     else -> {
                         blocks.add(AgendaBlock(name.trim(), AgendaValidator.todayAt(s), AgendaValidator.todayAt(e)))
                         name = ""; start = ""; end = ""; error = null
                     }
                 }
-            }, modifier = Modifier.fillMaxWidth()) { Text("Agregar bloque") }
+            }, modifier = Modifier.fillMaxWidth()) { Text("Agregar a mi día") }
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             Button(
-                enabled = blocks.isNotEmpty(),
-                onClick = { error = AlarmFlow.commitAgenda(this@AlarmActivity, blocks.toList()) },
+                enabled = blocks.isNotEmpty() || flex.isNotEmpty(),
+                onClick = { error = AlarmFlow.commitAgenda(this@AlarmActivity, blocks.toList(), flex.toList()) },
                 modifier = Modifier.fillMaxWidth().height(72.dp)
             ) { Text("CONFIRMAR COMPROMISO (no se puede cambiar)") }
         }
