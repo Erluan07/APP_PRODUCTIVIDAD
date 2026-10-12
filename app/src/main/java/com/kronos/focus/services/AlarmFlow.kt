@@ -5,6 +5,8 @@ import com.kronos.focus.data.AlarmPhase
 import com.kronos.focus.data.AlarmStateStore
 import com.kronos.focus.domain.rules.AppRulesConfig
 import com.kronos.focus.data.AgendaStore
+import com.kronos.focus.data.SleepLogStore
+import com.kronos.focus.data.StatsStore
 import com.kronos.focus.data.BunkerStateStore
 import com.kronos.focus.domain.agenda.AgendaBlock
 import com.kronos.focus.domain.agenda.AgendaValidator
@@ -14,10 +16,14 @@ import kotlin.random.Random
 object AlarmFlow {
 
     /** Hora límite o Smart Wake-Up: empieza a sonar. [test] no consume la alarma real del día. */
-    fun ring(ctx: Context, test: Boolean = false) {
+    fun ring(ctx: Context, test: Boolean = false, smart: Boolean = false) {
         val s = AlarmStateStore.get(ctx)
         if (!test) {
             if (s.lastRingDay == AlarmScheduler.epochDay()) return
+            val now = System.currentTimeMillis()
+            val early = if (smart) ((AlarmScheduler.nextDeadline(now, false) - now) / 60_000L).toInt().coerceAtLeast(0) else 0
+            SleepLogStore.get(ctx).recordWake(now, early, smart, AlarmScheduler.epochDay())
+            SleepTrackService.stop(ctx)
             s.lastRingDay = AlarmScheduler.epochDay()
             AlarmScheduler.cancelRing(ctx)
             resetMute(s)
@@ -61,6 +67,7 @@ object AlarmFlow {
         if (s.phase != AlarmPhase.RITUAL) return "No hay un ritual activo."
         AgendaValidator.validate(blocks, System.currentTimeMillis(), flexNames.size)?.let { return it }
         AgendaStore.get(ctx).commit(blocks, flexNames, AlarmScheduler.epochDay())
+        StatsStore.get(ctx).recordCommit(AlarmScheduler.epochDay(), blocks.size + flexNames.distinct().size)
         AlarmScheduler.scheduleBlocks(ctx)
         if (BunkerStateStore.get(ctx).isActive()) BunkerWatchdogService.start(ctx)
         toCheckWait(ctx, s)

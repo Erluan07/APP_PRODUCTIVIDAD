@@ -31,6 +31,8 @@
 
     <!-- ===== Fase 4: Proof of Work ===== -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <!-- ===== Fase 5: Boot Trap ===== -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -119,10 +121,10 @@
         <!-- Fase 2: alarma -->
         <service android:name=".services.AlarmService" android:exported="false"
             android:directBootAware="true" android:foregroundServiceType="mediaPlayback" />
-        <service android:name=".services.SmartWakeService" android:exported="false"
-            android:directBootAware="true" android:foregroundServiceType="specialUse">
+        <service android:name=".services.SleepTrackService" android:exported="false"
+            android:foregroundServiceType="specialUse|microphone">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Detecta micro-movimientos durante la ventana de despertar inteligente" />
+                android:value="Seguimiento de sueño con acelerómetro y volumen para despertar en sueño ligero" />
         </service>
         <receiver android:name=".receivers.AlarmReceiver" android:exported="false"
             android:directBootAware="true" />

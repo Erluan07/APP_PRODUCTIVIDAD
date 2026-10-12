@@ -3,6 +3,11 @@ package com.kronos.focus
 import com.kronos.focus.domain.agenda.AgendaBlock
 import com.kronos.focus.domain.agenda.AgendaValidator
 import com.kronos.focus.domain.agenda.TaskImport
+import com.kronos.focus.domain.sleep.Epoch
+import com.kronos.focus.domain.sleep.SleepModel
+import com.kronos.focus.domain.sleep.SleepParams
+import com.kronos.focus.domain.stats.DayStat
+import com.kronos.focus.domain.stats.StreakCalc
 import com.kronos.focus.domain.rules.AppRulesConfig
 import com.kronos.focus.services.AlarmScheduler
 import org.junit.Assert.*
@@ -78,5 +83,46 @@ class RulesTest {
         assertTrue(AppRulesConfig.isAllowed("com.miui.home", launchers, imes, strict = true))
         assertFalse(AppRulesConfig.isAllowed("com.google.android.apps.messaging", launchers, imes, strict = true))
         assertTrue(AppRulesConfig.isAllowed("com.google.android.apps.messaging", launchers, imes, strict = false))
+    }
+
+    private fun quiet() = List(6) { Epoch(0, false, false) }
+    private fun stirring() = List(6) { Epoch(2, false, false) }
+
+    @Test fun sleepModelWakesOnlyWhenStirringInsideWindow() {
+        val p = SleepParams()
+        val lightPhase = 5.0 * 90 - 10      // final de un ciclo (sueño ligero probable)
+        val deepPhase = 5.0 * 90 + 20       // inicio de ciclo (sueño profundo probable)
+        assertFalse(SleepModel.shouldWake(quiet(), lightPhase, 10.0, p))
+        assertTrue(SleepModel.shouldWake(stirring(), lightPhase, 10.0, p))
+        assertFalse(SleepModel.shouldWake(stirring(), lightPhase, 40.0, p))   // fuera de la ventana de 25 min
+        assertFalse(SleepModel.shouldWake(stirring(), lightPhase, -1.0, p))   // la alarma ya pasó
+        assertTrue(SleepModel.cycleLightness(lightPhase) > SleepModel.cycleLightness(deepPhase))
+    }
+
+    @Test fun sleepModelUsesSoundWhenMicIsValid() {
+        val loud = List(6) { Epoch(1, true, true) }
+        val silentMic = List(6) { Epoch(1, false, true) }
+        assertTrue(SleepModel.activity(loud) > SleepModel.activity(silentMic))
+    }
+
+    @Test fun sleepModelLearnsFromRating() {
+        val p = SleepParams(25, 0.55f)
+        assertEquals(p, SleepModel.adjust(p, 5, 20))
+        val early = SleepModel.adjust(p, 1, 20)
+        assertTrue(early.windowMin < p.windowMin && early.threshold > p.threshold)
+        val late = SleepModel.adjust(p, 2, 0)
+        assertTrue(late.windowMin > p.windowMin && late.threshold < p.threshold)
+        var q = p
+        repeat(20) { q = SleepModel.adjust(q, 1, 20) }
+        assertTrue(q.windowMin >= 5 && q.threshold <= 0.8f)
+    }
+
+    @Test fun streaks() {
+        val ok = DayStat(2, 2, 0); val bad = DayStat(2, 1, 0)
+        val days = mapOf(10L to ok, 11L to ok, 12L to bad, 13L to ok, 14L to ok, 15L to ok)
+        assertEquals(3, StreakCalc.current(days, 15L))
+        assertEquals(3, StreakCalc.best(days))
+        assertEquals(3, StreakCalc.current(days, 16L)) // hoy aún sin cumplir: cuenta hasta ayer
+        assertEquals(0, StreakCalc.current(mapOf(15L to bad, 14L to bad), 15L))
     }
 }

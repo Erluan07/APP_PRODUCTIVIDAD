@@ -9,7 +9,7 @@ import com.kronos.focus.services.AlarmFlow
 import com.kronos.focus.services.BunkerWatchdogService
 import com.kronos.focus.services.AlarmScheduler
 import com.kronos.focus.services.SleepReminder
-import com.kronos.focus.services.SmartWakeService
+import com.kronos.focus.services.SleepTrackService
 
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -25,7 +25,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 AlarmScheduler.scheduleSleep(context)
             }
             AlarmScheduler.ACTION_SMART ->
-                if (s.lastRingDay != AlarmScheduler.epochDay() && s.phase == AlarmPhase.IDLE) SmartWakeService.start(context)
+                if (s.lastRingDay != AlarmScheduler.epochDay() && s.phase == AlarmPhase.IDLE) SleepTrackService.start(context, fromUser = false)
         }
     }
 }

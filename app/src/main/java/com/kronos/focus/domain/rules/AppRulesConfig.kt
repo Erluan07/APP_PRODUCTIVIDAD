@@ -99,6 +99,9 @@ object AppRulesConfig {
     /** UIDs NFC permitidos en hexadecimal mayúsculas (opcional; también vale una etiqueta NDEF de texto = ALARM_QR_VALUE). */
     val NFC_UIDS: Set<String> = emptySet()
 
+    /** Usa el micrófono (solo volumen, sin grabar) durante el seguimiento de sueño que inicias con "Me voy a dormir". */
+    const val SLEEP_USE_MICROPHONE = true
+
     /** Smart Wake-Up: delta de aceleración (m/s²) que cuenta como micro-movimiento y nº por época de 30 s. */
     const val SMART_MOVE_DELTA = 0.15f
     const val SMART_MOVE_COUNT = 4

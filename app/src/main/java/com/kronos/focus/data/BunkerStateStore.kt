@@ -15,6 +15,7 @@ class BunkerStateStore private constructor(
     private val prefs: SharedPreferences,
     private val agenda: AgendaStore,
     private val alarm: AlarmStateStore,
+    private val stats: StatsStore,
 ) {
 
     @Volatile private var endsAtMs: Long = prefs.getLong(KEY_ENDS_AT, 0L)
@@ -96,7 +97,7 @@ class BunkerStateStore private constructor(
         val line = "${System.currentTimeMillis()}|${if (allowed) 1 else 0}|$pkg"
         val list = (listOf(line) + recent().map { "${it.first}|${if (it.second) 1 else 0}|${it.third}" }).take(15)
         val e = prefs.edit().putString(KEY_RECENT, list.joinToString("\n"))
-        if (!allowed) e.putInt(KEY_BLOCKED, blockedCount() + 1)
+        if (!allowed) { e.putInt(KEY_BLOCKED, blockedCount() + 1); stats.recordBlocked(epochDay(System.currentTimeMillis())) }
         e.apply()
     }
 
@@ -122,7 +123,7 @@ class BunkerStateStore private constructor(
         fun get(context: Context): BunkerStateStore = instance ?: synchronized(this) {
             instance ?: run {
                 val dp = context.applicationContext.createDeviceProtectedStorageContext()
-                BunkerStateStore(dp.getSharedPreferences("bunker_state", Context.MODE_PRIVATE), AgendaStore.get(context), AlarmStateStore.get(context))
+                BunkerStateStore(dp.getSharedPreferences("bunker_state", Context.MODE_PRIVATE), AgendaStore.get(context), AlarmStateStore.get(context), StatsStore.get(context))
             }.also { instance = it }
         }
     }

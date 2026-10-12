@@ -33,6 +33,8 @@ import com.kronos.focus.data.AlarmStateStore
 import com.kronos.focus.admin.DeviceOwnerHardening
 import com.kronos.focus.data.AgendaStore
 import com.kronos.focus.data.ProofStore
+import com.kronos.focus.data.SleepLogStore
+import com.kronos.focus.services.SleepTrackService
 import android.app.NotificationManager
 import android.net.Uri
 import android.os.PowerManager
@@ -62,6 +64,16 @@ class MainActivity : ComponentActivity() {
     private fun pasteTasks() {
         val clip = getSystemService(ClipboardManager::class.java).primaryClip
         importText(clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)?.toString().orEmpty())
+    }
+
+    private val micLauncher = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {
+        SleepTrackService.start(this, fromUser = true) // con o sin micrófono: sin permiso usa solo movimiento
+    }
+
+    private fun startSleepTracking() {
+        val needMic = AppRulesConfig.SLEEP_USE_MICROPHONE &&
+            checkSelfPermission(Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (needMic) micLauncher.launch(Manifest.permission.RECORD_AUDIO) else SleepTrackService.start(this, fromUser = true)
     }
 
     private val camLauncher = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {}
@@ -129,6 +141,26 @@ class MainActivity : ComponentActivity() {
                 OutlinedButton(onClick = { store.debugClear() }) { Text("Salir del búnker (solo versión de prueba)") }
             }
 
+            HorizontalDivider()
+            val sleepLog = SleepLogStore.get(this@MainActivity)
+            if (sleepLog.pendingRating()) {
+                Text("¿Cómo te sentiste al despertar?", style = MaterialTheme.typography.titleSmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("1 😫", "2 😕", "3 😐", "4 🙂", "5 😄").forEachIndexed { i, label ->
+                        OutlinedButton(onClick = { sleepLog.rate(i + 1) }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text(label) }
+                    }
+                }
+                Text("Tu respuesta ajusta solo el despertar inteligente.", style = MaterialTheme.typography.bodySmall)
+            }
+            if (SleepTrackService.running) {
+                Text("Registrando tu sueño… (acelerómetro${if (AppRulesConfig.SLEEP_USE_MICROPHONE) " + volumen" else ""}). Deja el teléfono cargando junto a la cama.",
+                    style = MaterialTheme.typography.bodySmall)
+            } else {
+                Button(onClick = { startSleepTracking() }) { Text("Me voy a dormir 🌙") }
+            }
+            val sp = sleepLog.params()
+            Text("Despertar inteligente: ventana ${sp.windowMin} min · umbral ${"%.2f".format(sp.threshold)} (se ajusta con tu valoración)", style = MaterialTheme.typography.bodySmall)
+            StatsSection(this@MainActivity, now)
             HorizontalDivider()
             Text("Agenda de hoy (fija tras el ritual)", style = MaterialTheme.typography.titleSmall)
             val agendaFmt = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }

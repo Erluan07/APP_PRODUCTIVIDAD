@@ -25,6 +25,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.kronos.focus.data.AgendaStore
 import com.kronos.focus.data.ProofStore
+import com.kronos.focus.data.StatsStore
+import com.kronos.focus.services.AlarmScheduler
 import java.io.File
 
 /**
@@ -89,6 +91,7 @@ class ProofActivity : ComponentActivity() {
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                     if (ProofStore.get(this@ProofActivity).append(task, kind, file)) {
                         if (kind == KIND_FLEX) AgendaStore.get(this@ProofActivity).setFlexDone(task, true)
+                        StatsStore.get(this@ProofActivity).recordDone(AlarmScheduler.epochDay())
                         Toast.makeText(this@ProofActivity, "Evidencia guardada ✔", Toast.LENGTH_LONG).show()
                         finish()
                     } else {
