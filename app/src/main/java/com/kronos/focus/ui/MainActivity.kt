@@ -31,6 +31,7 @@ import com.kronos.focus.services.AlarmFlow
 import com.kronos.focus.services.AlarmScheduler
 import com.kronos.focus.data.AlarmStateStore
 import com.kronos.focus.data.AgendaStore
+import com.kronos.focus.data.ProofStore
 import android.app.NotificationManager
 import android.net.Uri
 import android.os.PowerManager
@@ -124,10 +125,25 @@ class MainActivity : ComponentActivity() {
             val agendaFmt = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
             val agenda = AgendaStore.get(this@MainActivity).blocks()
             if (agenda.isEmpty()) Text("Sin agenda confirmada.", style = MaterialTheme.typography.bodySmall)
+            val proofs = ProofStore.get(this@MainActivity)
             agenda.forEach {
-                val state = when { now >= it.endMs -> "✔"; now >= it.startMs -> "▶ búnker"; else -> "⏳" }
-                Text("${agendaFmt.format(Date(it.startMs))}–${agendaFmt.format(Date(it.endMs))}  ${it.name}  $state", style = MaterialTheme.typography.bodySmall)
+                val proved = remember(it.name, now / 3000) { proofs.hasProofToday(it.name) }
+                val state = when {
+                    proved -> "✔ con foto"
+                    now >= it.endMs -> "falta foto"
+                    now >= it.startMs -> "▶ búnker"
+                    else -> "⏳"
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("${agendaFmt.format(Date(it.startMs))}–${agendaFmt.format(Date(it.endMs))}  ${it.name}  $state", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                    if (!proved && now >= it.startMs) {
+                        TextButton(onClick = { startActivity(ProofActivity.intent(this@MainActivity, it.name, ProofActivity.KIND_BLOCK)) }) { Text("📷 Foto") }
+                    }
+                }
             }
+            val total = remember(now / 5000) { proofs.count() }
+            val intact = remember(now / 10000) { proofs.verify() }
+            Text("Evidencias: $total · registro ${if (intact) "íntegro ✔" else "ALTERADO ✖"}", style = MaterialTheme.typography.bodySmall)
             HorizontalDivider()
             val tm = TaskManagerClient.pending(this@MainActivity)
             Text(when (tm) {
@@ -138,6 +154,7 @@ class MainActivity : ComponentActivity() {
                 ctx = this@MainActivity, now = now, bunkerActive = store.isActive(now),
                 onImportFile = { importLauncher.launch(arrayOf("*/*")) },
                 onPaste = { pasteTasks() },
+                onProof = { task, kind -> startActivity(ProofActivity.intent(this@MainActivity, task, kind)) },
                 onStartTask = { min ->
                     store.startSession(min)
                     BunkerWatchdogService.start(this@MainActivity)

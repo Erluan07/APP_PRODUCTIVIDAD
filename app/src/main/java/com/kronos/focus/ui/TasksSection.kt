@@ -52,6 +52,7 @@ fun TasksSection(
     onImportFile: () -> Unit,
     onPaste: () -> Unit,
     onStartTask: (Long) -> Unit,
+    onProof: (String, String) -> Unit,
 ) {
     val agenda = AgendaStore.get(ctx)
     val templates = TemplateStore.get(ctx)
@@ -73,11 +74,11 @@ fun TasksSection(
                 Text(if (f.done) "✔ ${f.name}" else f.name, modifier = Modifier.weight(1f))
                 if (!f.done) {
                     Button(enabled = !bunkerActive, onClick = { picking = f.name }) { Text("Empezar") }
-                    OutlinedButton(onClick = { agenda.setFlexDone(f.name, true); tick++ }) { Text("Hecha") }
+                    OutlinedButton(onClick = { onProof(f.name, "flex") }) { Text("Hecha 📷") }
                 }
             }
         }
-        Text("“Hecha” aún no pide foto de evidencia (llega en la Fase 4).", style = MaterialTheme.typography.bodySmall)
+        Text("Para marcar una tarea como hecha tomas una foto de evidencia (cámara en vivo).", style = MaterialTheme.typography.bodySmall)
 
         HorizontalDivider()
         Text("Agregar una tarea a hoy", style = MaterialTheme.typography.titleSmall)

@@ -64,6 +64,8 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".ui.ProofActivity" android:exported="false" />
+
         <!-- Fase 1: bloqueo reactivo -->
         <service
             android:name=".services.BunkerAccessibilityService"
