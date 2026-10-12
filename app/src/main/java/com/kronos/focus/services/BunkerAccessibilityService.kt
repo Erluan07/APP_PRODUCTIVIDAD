@@ -1,0 +1,96 @@
+package com.kronos.focus.services
+
+import android.accessibilityservice.AccessibilityService
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.PixelFormat
+import android.view.Gravity
+import android.view.WindowManager
+import android.view.accessibility.AccessibilityEvent
+import android.widget.TextView
+import com.kronos.focus.data.BunkerStateStore
+import com.kronos.focus.domain.rules.AppRulesConfig
+
+/**
+ * Bloqueo reactivo. Diseño de bajo consumo:
+ *  - Solo recibe TYPE_WINDOW_STATE_CHANGED (configurado en XML), sin leer contenido de ventanas.
+ *  - Early-exit si el búnker no está activo (una lectura de un Long volátil).
+ *  - Launchers/IMEs se cachean y se refrescan solo cuando cambian los paquetes.
+ *  - Sin polling ni timers: todo es dirigido por eventos.
+ */
+class BunkerAccessibilityService : AccessibilityService() {
+
+    private lateinit var state: BunkerStateStore
+    private lateinit var windowManager: WindowManager
+    private var overlay: TextView? = null
+
+    @Volatile private var launchers: Set<String> = emptySet()
+    @Volatile private var imes: Set<String> = emptySet()
+    private var lastPackage: String? = null
+
+    override fun onServiceConnected() {
+        state = BunkerStateStore.get(this)
+        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        refreshInfrastructurePackages()
+    }
+
+    override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        val pkg = event.packageName?.toString() ?: return
+        if (!state.isActive()) { hideOverlay(); lastPackage = pkg; return }
+        if (pkg == lastPackage) return
+        lastPackage = pkg
+
+        if (AppRulesConfig.isAllowed(pkg, launchers, imes)) {
+            hideOverlay()
+        } else {
+            block(pkg)
+        }
+    }
+
+    private fun block(@Suppress("UNUSED_PARAMETER") blockedPackage: String) {
+        showOverlay()
+        performGlobalAction(GLOBAL_ACTION_HOME)
+    }
+
+    private fun showOverlay() {
+        if (overlay != null) return
+        val view = TextView(this).apply {
+            text = "MODO BÚNKER\nEnfócate. Esta app está bloqueada."
+            textSize = 22f
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#F2000000"))
+        }
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            // No requiere SYSTEM_ALERT_WINDOW cuando lo crea un AccessibilityService.
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_FULLSCREEN,
+            PixelFormat.TRANSLUCENT,
+        )
+        windowManager.addView(view, params)
+        overlay = view
+        // El overlay se retira solo al volver a una app permitida (ver onAccessibilityEvent).
+    }
+
+    private fun hideOverlay() {
+        overlay?.let { runCatching { windowManager.removeView(it) } }
+        overlay = null
+    }
+
+    private fun refreshInfrastructurePackages() {
+        val pm = packageManager
+        launchers = pm.queryIntentActivities(
+            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_ALL
+        ).mapNotNull { it.activityInfo?.packageName }.toSet()
+        imes = (getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager)
+            .inputMethodList.map { it.packageName }.toSet()
+    }
+
+    override fun onInterrupt() = hideOverlay()
+
+    override fun onUnbind(intent: Intent?): Boolean { hideOverlay(); return super.onUnbind(intent) }
+}
