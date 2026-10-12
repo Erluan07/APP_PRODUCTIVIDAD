@@ -60,9 +60,11 @@ class AlarmActivity : ComponentActivity() {
     private fun Content() {
         var phase by remember { mutableStateOf(store.phase) }
         var remaining by remember { mutableLongStateOf(0L) }
+        var muteLeft by remember { mutableLongStateOf(0L) }
         LaunchedEffect(Unit) {
             while (true) {
                 phase = store.phase
+                muteLeft = ((store.muteUntilMs - System.currentTimeMillis() + 999) / 1000).coerceAtLeast(0)
                 remaining = ((store.checkDeadlineMs - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
                 if (!store.uiRequired()) { finish(); break }
                 delay(250)
@@ -79,6 +81,14 @@ class AlarmActivity : ComponentActivity() {
             } else {
                 Text("¡DESPIERTA!", style = MaterialTheme.typography.headlineLarge)
                 Text("Levántate y escanea el código del baño/cocina, o acerca la etiqueta NFC.")
+                if (muteLeft > 0) {
+                    Text("Silencio: $muteLeft s para escanear. Si no escaneas, vuelve el ruido.",
+                        style = MaterialTheme.typography.titleMedium)
+                } else {
+                    Button(onClick = { AlarmFlow.muteForScan(this@AlarmActivity) }, modifier = Modifier.fillMaxWidth().height(64.dp)) {
+                        Text("Ya desperté, voy a escanear (silencio ${AppRulesConfig.MUTE_SECONDS} s)")
+                    }
+                }
                 if (camGranted) {
                     Scanner(Modifier.fillMaxWidth().weight(1f)) { value -> onCode(value) }
                 } else {

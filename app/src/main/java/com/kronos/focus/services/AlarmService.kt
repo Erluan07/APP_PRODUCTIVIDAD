@@ -45,6 +45,7 @@ class AlarmService : Service() {
             val now = System.currentTimeMillis()
             if (store.phase == AlarmPhase.CHECK_ACTIVE && now > store.checkDeadlineMs) AlarmFlow.escalate(this@AlarmService)
             enforceVolume()
+            syncSound()
             if (!AlarmActivity.visible && now - lastLaunch > 2_500L) { lastLaunch = now; launchUi() }
             handler.postDelayed(this, 500L)
         }
@@ -66,7 +67,7 @@ class AlarmService : Service() {
             wl = getSystemService(PowerManager::class.java)
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "kronos:alarm").apply { acquire(60 * 60_000L) }
         }
-        startSound()
+        syncSound()
         if (observer == null) {
             observer = object : ContentObserver(handler) {
                 override fun onChange(selfChange: Boolean) = enforceVolume()
@@ -108,9 +109,24 @@ class AlarmService : Service() {
         player?.setVolume(1f, 1f)
     }
 
+    /** Suena salvo durante el silencio temporal ("voy a escanear"); al expirar, reanuda solo. */
+    private fun syncSound() {
+        val muted = store.phase == AlarmPhase.RINGING && System.currentTimeMillis() < store.muteUntilMs
+        if (muted) pauseSound() else resumeSound()
+    }
+
+    private fun pauseSound() {
+        runCatching { if (player?.isPlaying == true) player?.pause() }
+        runCatching { getSystemService(Vibrator::class.java).cancel() }
+    }
+
     @Suppress("DEPRECATION")
-    private fun startSound() {
-        if (player?.isPlaying == true) return
+    private fun resumeSound() {
+        val p = player
+        if (p != null) {
+            if (!p.isPlaying) { runCatching { p.start() }; vibrate() }
+            return
+        }
         runCatching {
             val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
                 ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
@@ -125,6 +141,10 @@ class AlarmService : Service() {
             }
         }
         enforceVolume()
+        vibrate()
+    }
+
+    private fun vibrate() {
         runCatching {
             getSystemService(Vibrator::class.java)
                 .vibrate(VibrationEffect.createWaveform(longArrayOf(0, 800, 400), 0))

@@ -86,6 +86,11 @@ object AppRulesConfig {
     const val SMART_MOVE_DELTA = 0.15f
     const val SMART_MOVE_COUNT = 4
 
+    /** Silencio temporal al pulsar "Ya desperté, voy a escanear". Si no escaneas a tiempo, vuelve a sonar. */
+    const val MUTE_SECONDS = 25
+    /** Veces que se puede pedir el silencio por alarma (Int.MAX_VALUE = sin límite). */
+    const val MUTE_MAX_USES = Int.MAX_VALUE
+
     // ---- Parámetros de comportamiento ----
     const val WAKE_CHECK_MIN_DELAY_MIN = 7
     const val WAKE_CHECK_MAX_DELAY_MIN = 10
