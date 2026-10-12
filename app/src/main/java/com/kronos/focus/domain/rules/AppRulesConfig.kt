@@ -1,5 +1,7 @@
 package com.kronos.focus.domain.rules
 
+import java.util.Calendar
+
 /**
  * REGLAS INMUTABLES.
  *
@@ -73,8 +75,23 @@ object AppRulesConfig {
     )
 
     // ---- Alarma (Fase 2). Edita y recompila para cambiarlos. ----
-    const val ALARM_HOUR = 7
-    const val ALARM_MINUTE = 0
+    /** Hora de la alarma por día (hora, minuto). Devuelve null para no tener alarma ese día. */
+    fun alarmAt(dayOfWeek: Int): Pair<Int, Int>? = when (dayOfWeek) {
+        Calendar.SATURDAY, Calendar.SUNDAY -> 8 to 30
+        else -> 7 to 0
+    }
+
+    // ---- Modo Dormir: desde SLEEP_START_MIN hasta la alarma del día siguiente solo se permite lo esencial ----
+    const val SLEEP_START_MIN = 22 * 60 + 30
+    /** Fin del Modo Dormir si ese día no hay alarma configurada. */
+    const val SLEEP_FALLBACK_END_MIN = 7 * 60
+    val SLEEP_WHITELIST: Set<String> = setOf(
+        APP_PACKAGE,
+        "com.google.android.dialer", "com.android.dialer", "com.samsung.android.dialer",
+        "com.samsung.android.incallui", "com.android.incallui", "com.android.server.telecom", "com.android.phone",
+        "com.spotify.music", // sonidos para dormir
+    )
+    val STRICT_PREFIXES: List<String> = listOf("com.spotify")
 
     /** Texto que debe contener el QR/Barcode (o la etiqueta NFC de texto) pegado en el baño/cocina. */
     const val ALARM_QR_VALUE = "KRONOS-BANO-01"
@@ -111,9 +128,10 @@ object AppRulesConfig {
     const val BOOT_TRAP_PENALTY_MIN = 60L
 
     /** Nombres de paquete que jamás deben bloquearse (llamadas de emergencia). */
-    fun isAllowed(pkg: String, launchers: Set<String>, imes: Set<String>): Boolean =
+    fun isAllowed(pkg: String, launchers: Set<String>, imes: Set<String>, strict: Boolean = false): Boolean =
         pkg !in ALWAYS_BLOCKED_IN_BUNKER &&
             BLOCKED_PREFIXES.none { pkg.startsWith(it) } && !pkg.contains(".settings") &&
-            (pkg in WHITELIST || ALLOWED_PREFIXES.any { pkg.startsWith(it) } ||
+            (pkg in (if (strict) SLEEP_WHITELIST else WHITELIST) ||
+                (if (strict) STRICT_PREFIXES else ALLOWED_PREFIXES).any { pkg.startsWith(it) } ||
                 pkg in SYSTEM_ALLOWED || pkg in launchers || pkg in imes)
 }

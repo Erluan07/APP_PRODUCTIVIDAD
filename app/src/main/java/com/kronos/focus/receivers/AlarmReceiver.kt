@@ -8,6 +8,7 @@ import com.kronos.focus.data.AlarmStateStore
 import com.kronos.focus.services.AlarmFlow
 import com.kronos.focus.services.BunkerWatchdogService
 import com.kronos.focus.services.AlarmScheduler
+import com.kronos.focus.services.SleepReminder
 import com.kronos.focus.services.SmartWakeService
 
 class AlarmReceiver : BroadcastReceiver() {
@@ -18,6 +19,11 @@ class AlarmReceiver : BroadcastReceiver() {
             AlarmScheduler.ACTION_TEST -> AlarmFlow.ring(context, test = true)
             AlarmScheduler.ACTION_CHECK -> AlarmFlow.startCheck(context)
             AlarmScheduler.ACTION_BLOCK -> BunkerWatchdogService.start(context)
+            AlarmScheduler.ACTION_SLEEP -> {
+                SleepReminder.post(context)
+                BunkerWatchdogService.start(context)
+                AlarmScheduler.scheduleSleep(context)
+            }
             AlarmScheduler.ACTION_SMART ->
                 if (s.lastRingDay != AlarmScheduler.epochDay() && s.phase == AlarmPhase.IDLE) SmartWakeService.start(context)
         }

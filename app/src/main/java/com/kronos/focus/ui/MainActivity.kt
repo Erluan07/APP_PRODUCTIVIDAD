@@ -114,9 +114,10 @@ class MainActivity : ComponentActivity() {
             Text("Pausa fija sin búnker: $free", style = MaterialTheme.typography.bodySmall)
 
             if (store.isActive(now)) {
-                Text("MODO BÚNKER ACTIVO", style = MaterialTheme.typography.titleLarge)
+                val sleeping = store.isSleepMode(now)
+                Text(if (sleeping) "MODO DORMIR ACTIVO" else "MODO BÚNKER ACTIVO", style = MaterialTheme.typography.titleLarge)
                 Text("Quedan %d:%02d".format(remaining / 60, remaining % 60), style = MaterialTheme.typography.displayMedium)
-                Text("Permitido: Teléfono, WhatsApp, Spotify, Mensajes y Contactos.")
+                Text(if (sleeping) "Permitido: Teléfono y Spotify (hasta tu alarma)." else "Permitido: Teléfono, WhatsApp, Spotify, Mensajes y Contactos.")
             } else {
                 Button(enabled = a11y, onClick = {
                     store.startSession(TEST_BUNKER_MIN)
@@ -169,8 +170,11 @@ class MainActivity : ComponentActivity() {
                 },
             )
             HorizontalDivider()
-            Text("Alarma %02d:%02d (ventana Smart Wake-Up: %d min)".format(AppRulesConfig.ALARM_HOUR, AppRulesConfig.ALARM_MINUTE, AppRulesConfig.SMART_WAKE_WINDOW_MIN),
+            val nextAlarm = AlarmScheduler.nextDeadline(now, AlarmStateStore.get(this@MainActivity).lastRingDay == AlarmScheduler.epochDay())
+            Text("Próxima alarma: ${SimpleDateFormat("EEEE HH:mm", Locale.getDefault()).format(Date(nextAlarm))} (ventana Smart Wake-Up: ${AppRulesConfig.SMART_WAKE_WINDOW_MIN} min)",
                 style = MaterialTheme.typography.titleSmall)
+            Text("Modo Dormir desde las %02d:%02d hasta tu alarma.".format(AppRulesConfig.SLEEP_START_MIN / 60, AppRulesConfig.SLEEP_START_MIN % 60),
+                style = MaterialTheme.typography.bodySmall)
             Text("Código a escanear: ${AppRulesConfig.ALARM_QR_VALUE} · Fase: ${AlarmStateStore.get(this@MainActivity).phase}",
                 style = MaterialTheme.typography.bodySmall)
             if (checkSelfPermission(Manifest.permission.CAMERA) != android.content.pm.PackageManager.PERMISSION_GRANTED) {

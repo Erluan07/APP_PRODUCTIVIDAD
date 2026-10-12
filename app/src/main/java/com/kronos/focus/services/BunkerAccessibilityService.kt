@@ -53,7 +53,7 @@ class BunkerAccessibilityService : AccessibilityService() {
         }
         if (!state.isActive()) { hideOverlay(); lastPackage = pkg; return }
 
-        if (AppRulesConfig.isAllowed(pkg, launchers, imes)) {
+        if (AppRulesConfig.isAllowed(pkg, launchers, imes, strict = state.isSleepMode())) {
             if (pkg != lastPackage) state.recordSeen(pkg, true)
             hideOverlay()
         } else {

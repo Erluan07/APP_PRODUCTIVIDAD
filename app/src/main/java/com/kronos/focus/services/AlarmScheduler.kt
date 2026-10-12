@@ -18,22 +18,38 @@ object AlarmScheduler {
     const val ACTION_SMART = "com.kronos.focus.ALARM_SMART_START"
     const val ACTION_CHECK = "com.kronos.focus.ALARM_WAKE_CHECK"
     const val ACTION_BLOCK = "com.kronos.focus.BUNKER_BLOCK_START"
+    const val ACTION_SLEEP = "com.kronos.focus.SLEEP_MODE_START"
     const val ACTION_TEST = "com.kronos.focus.ALARM_TEST"
 
     fun epochDay(): Long = LocalDate.now().toEpochDay()
 
+    /** Próxima hora de alarma según la configuración por día de la semana (null en un día = sin alarma). */
     fun nextDeadline(now: Long, skipToday: Boolean): Long {
+        for (offset in 0..7) {
+            val c = Calendar.getInstance().apply { timeInMillis = now; add(Calendar.DAY_OF_YEAR, offset) }
+            val (h, m) = AppRulesConfig.alarmAt(c.get(Calendar.DAY_OF_WEEK)) ?: continue
+            c.set(Calendar.HOUR_OF_DAY, h); c.set(Calendar.MINUTE, m)
+            c.set(Calendar.SECOND, 0); c.set(Calendar.MILLISECOND, 0)
+            if (c.timeInMillis <= now) continue
+            if (skipToday && offset == 0) continue
+            return c.timeInMillis
+        }
+        return now + 24 * 3_600_000L // sin alarmas configuradas
+    }
+
+    /** Próximo inicio del Modo Dormir (hora local fija). */
+    fun nextSleepStart(now: Long): Long {
         val c = Calendar.getInstance().apply {
             timeInMillis = now
-            set(Calendar.HOUR_OF_DAY, AppRulesConfig.ALARM_HOUR)
-            set(Calendar.MINUTE, AppRulesConfig.ALARM_MINUTE)
+            set(Calendar.HOUR_OF_DAY, AppRulesConfig.SLEEP_START_MIN / 60); set(Calendar.MINUTE, AppRulesConfig.SLEEP_START_MIN % 60)
             set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
         }
         if (c.timeInMillis <= now) c.add(Calendar.DAY_OF_YEAR, 1)
-        val today = Calendar.getInstance().apply { timeInMillis = now }
-        val sameDay = c.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR) && c.get(Calendar.YEAR) == today.get(Calendar.YEAR)
-        if (skipToday && sameDay) c.add(Calendar.DAY_OF_YEAR, 1)
         return c.timeInMillis
+    }
+
+    fun scheduleSleep(ctx: Context) {
+        runCatching { am(ctx).setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextSleepStart(System.currentTimeMillis()), pi(ctx, ACTION_SLEEP)) }
     }
 
     private fun pi(ctx: Context, action: String) = PendingIntent.getBroadcast(
@@ -53,6 +69,7 @@ object AlarmScheduler {
         val smartAt = deadline - AppRulesConfig.SMART_WAKE_WINDOW_MIN * 60_000L
         val at = if (smartAt > now) smartAt else now + 2_000L
         runCatching { am(ctx).setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi(ctx, ACTION_SMART)) }
+        scheduleSleep(ctx)
     }
 
     fun scheduleCheck(ctx: Context, atMs: Long) {

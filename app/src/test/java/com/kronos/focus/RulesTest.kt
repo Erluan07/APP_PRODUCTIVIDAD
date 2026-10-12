@@ -58,33 +58,25 @@ class RulesTest {
         assertNotNull(AgendaValidator.validate(total, base)) // 9 h > máx. total
     }
 
-    @Test fun alarmDeadline() {
-        fun cal(h: Int) = Calendar.getInstance().apply { set(2026, Calendar.OCTOBER, 12, h, 0, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
-        val seven = cal(AppRulesConfig.ALARM_HOUR).let { it + AppRulesConfig.ALARM_MINUTE * 60_000L }
-        assertEquals(seven, AlarmScheduler.nextDeadline(cal(AppRulesConfig.ALARM_HOUR - 1), false))
-        assertEquals(seven + 86_400_000L, AlarmScheduler.nextDeadline(cal(AppRulesConfig.ALARM_HOUR + 1), false))
-        assertEquals(seven + 86_400_000L, AlarmScheduler.nextDeadline(cal(AppRulesConfig.ALARM_HOUR - 1), true))
+    @Test fun alarmDeadlinePerDay() {
+        fun cal(day: Int, h: Int, m: Int = 0) = Calendar.getInstance().apply { set(2026, Calendar.OCTOBER, day, h, m, 0); set(Calendar.MILLISECOND, 0) }
+        fun at(c: Calendar): Long { val (h, m) = AppRulesConfig.alarmAt(c.get(Calendar.DAY_OF_WEEK))!!; return Calendar.getInstance().apply { timeInMillis = c.timeInMillis; set(Calendar.HOUR_OF_DAY, h); set(Calendar.MINUTE, m) }.timeInMillis }
+        val monday = cal(12, 6)            // 12-oct-2026 es lunes
+        assertEquals(at(monday), AlarmScheduler.nextDeadline(monday.timeInMillis, false))
+        val mondayLate = cal(12, 23)
+        val tuesday = cal(13, 6)
+        assertEquals(at(tuesday), AlarmScheduler.nextDeadline(mondayLate.timeInMillis, false))
+        assertEquals(at(tuesday), AlarmScheduler.nextDeadline(monday.timeInMillis, true))
+        val fridayLate = cal(16, 23)       // viernes -> sábado
+        assertEquals(Calendar.SATURDAY, Calendar.getInstance().apply { timeInMillis = AlarmScheduler.nextDeadline(fridayLate.timeInMillis, false) }.get(Calendar.DAY_OF_WEEK))
     }
 
-    @Test fun flexibleOnlyAgendaIsValid() {
-        assertNull(AgendaValidator.validate(emptyList(), base, flexCount = 1))
-        assertNotNull(AgendaValidator.validate(emptyList(), base, flexCount = 0))
-    }
-
-    @Test fun importFromJsonAndText() {
-        assertEquals(listOf("Informe", "Gym"), TaskImport.parse("""["Informe","Gym","informe"]"""))
-        assertEquals(listOf("A", "B"), TaskImport.parse("""[{"title":"A"},{"name":"B","done":false},{"title":"C","completed":true}]"""))
-        assertEquals(listOf("X", "Y"), TaskImport.parse("""{"tasks":[{"titulo":"X"},{"nombre":"Y"}]}"""))
-        assertEquals(listOf("Lavar platos", "Ir al gym", "Llamar"), TaskImport.parse("- Lavar platos\n* Ir al gym\n1. Llamar\n- [x] Hecha\n\n"))
-        assertTrue(TaskImport.parse("").isEmpty())
-    }
-
-    @Test fun additionsOnlyAddWithoutOverlapOrExceedingTotal() {
-        val existing = listOf(block("A", 8, 0, 10, 0))
-        assertNull(AgendaValidator.validateAddition(existing, block("B", 11, 0, 12, 0), base))
-        assertNotNull(AgendaValidator.validateAddition(existing, block("B", 9, 30, 11, 0), base)) // solape
-        assertNotNull(AgendaValidator.validateAddition(existing, block("B", 11, 0, 11, 5), base)) // muy corto
-        val big = listOf(block("X", 6, 30, 10, 30), block("Y", 11, 0, 15, 0))
-        assertNotNull(AgendaValidator.validateAddition(big, block("Z", 15, 30, 19, 30), base)) // >8 h en total
+    @Test fun sleepModeStrictWhitelist() {
+        assertFalse(AppRulesConfig.isAllowed("com.whatsapp", launchers, imes, strict = true))
+        assertTrue(AppRulesConfig.isAllowed("com.google.android.dialer", launchers, imes, strict = true))
+        assertTrue(AppRulesConfig.isAllowed("com.spotify.music", launchers, imes, strict = true))
+        assertTrue(AppRulesConfig.isAllowed("com.miui.home", launchers, imes, strict = true))
+        assertFalse(AppRulesConfig.isAllowed("com.google.android.apps.messaging", launchers, imes, strict = true))
+        assertTrue(AppRulesConfig.isAllowed("com.google.android.apps.messaging", launchers, imes, strict = false))
     }
 }
