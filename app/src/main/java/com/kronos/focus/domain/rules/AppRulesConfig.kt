@@ -26,7 +26,32 @@ object AppRulesConfig {
         "com.whatsapp.w4b",
         // 3. Spotify
         "com.spotify.music",
+        // 4. Emergencias: mensajes y contactos (SMS/llamar a un contacto)
+        "com.google.android.apps.messaging",
+        "com.samsung.android.messaging",
+        "com.android.mms",
+        "com.google.android.contacts",
+        "com.samsung.android.app.contacts",
+        "com.android.contacts",
     )
+
+    /** Prefijos permitidos (variantes de la misma app: WhatsApp Business, procesos auxiliares). */
+    val ALLOWED_PREFIXES: List<String> = listOf("com.whatsapp", "com.spotify")
+
+    /** Cualquier paquete de ajustes se bloquea (cubre OEMs con paquetes distintos). */
+    val BLOCKED_PREFIXES: List<String> = listOf(
+        "com.android.settings", "com.samsung.android.settings", "com.miui.securitycenter",
+    )
+
+    /**
+     * Pausa fija (hora local, minutos desde medianoche). El búnker no se aplica en estas ventanas.
+     * EDITA AQUÍ tu hora de comer y recompila.
+     */
+    val FREE_WINDOWS: List<Pair<Int, Int>> = listOf(14 * 60 to 15 * 60)
+
+    /** Una sesión nunca puede pedir más que esto, ni el total pendiente (con penalizaciones) superarlo. */
+    const val MAX_SINGLE_BUNKER_MIN = 240L
+    const val MAX_TOTAL_BUNKER_MIN = 480L
 
     /**
      * Infraestructura imprescindible para que el teléfono siga usable (barra de estado,
@@ -57,5 +82,7 @@ object AppRulesConfig {
     /** Nombres de paquete que jamás deben bloquearse (llamadas de emergencia). */
     fun isAllowed(pkg: String, launchers: Set<String>, imes: Set<String>): Boolean =
         pkg !in ALWAYS_BLOCKED_IN_BUNKER &&
-            (pkg in WHITELIST || pkg in SYSTEM_ALLOWED || pkg in launchers || pkg in imes)
+            BLOCKED_PREFIXES.none { pkg.startsWith(it) } && !pkg.contains(".settings") &&
+            (pkg in WHITELIST || ALLOWED_PREFIXES.any { pkg.startsWith(it) } ||
+                pkg in SYSTEM_ALLOWED || pkg in launchers || pkg in imes)
 }

@@ -3,20 +3,19 @@ package com.kronos.focus.receivers
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.kronos.focus.BuildConfig
 import com.kronos.focus.data.BunkerStateStore
 import com.kronos.focus.domain.rules.AppRulesConfig
+import com.kronos.focus.services.AccessibilityGuard
+import com.kronos.focus.services.BunkerWatchdogService
 
-/**
- * Boot Trap (esqueleto Fase 5). Si había un bloque activo al reiniciar, aplica penalización.
- * TODO Fase 5: distinguir reinicio con bloque pendiente (marca en prefs device-protected)
- * y levantar el servicio de bloqueo/alarma.
- */
+/** Boot Trap: si había búnker pendiente, lo restaura. Penalización de +60 min solo en builds release. */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val store = BunkerStateStore.get(context)
-        if (store.isActive()) {
-            store.extendUntil(System.currentTimeMillis() + store.remainingMs() +
-                AppRulesConfig.BOOT_TRAP_PENALTY_MIN * 60_000L)
-        }
+        if (!store.isActive()) return
+        if (!BuildConfig.DEBUG) store.applyPenalty(AppRulesConfig.BOOT_TRAP_PENALTY_MIN)
+        AccessibilityGuard.tryEnable(context)
+        BunkerWatchdogService.start(context)
     }
 }

@@ -76,6 +76,15 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
+        <service
+            android:name=".services.BunkerWatchdogService"
+            android:exported="false"
+            android:directBootAware="true"
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Vigila que el bloqueo de distracciones siga activo" />
+        </service>
+
         <!-- Fase 5: Device Owner -->
         <receiver
             android:name=".admin.KronosDeviceAdminReceiver"

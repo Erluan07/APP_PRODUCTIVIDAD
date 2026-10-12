@@ -39,14 +39,16 @@ class BunkerAccessibilityService : AccessibilityService() {
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
         if (!state.isActive()) { hideOverlay(); lastPackage = pkg; return }
-        if (pkg == lastPackage) return
-        lastPackage = pkg
 
         if (AppRulesConfig.isAllowed(pkg, launchers, imes)) {
+            if (pkg != lastPackage) state.recordSeen(pkg, true)
             hideOverlay()
         } else {
+            // Los bloqueados se re-bloquean siempre (sin deduplicar) por si el HOME falló.
+            state.recordSeen(pkg, false)
             block(pkg)
         }
+        lastPackage = pkg
     }
 
     private fun block(@Suppress("UNUSED_PARAMETER") blockedPackage: String) {
@@ -92,5 +94,9 @@ class BunkerAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() = hideOverlay()
 
-    override fun onUnbind(intent: Intent?): Boolean { hideOverlay(); return super.onUnbind(intent) }
+    override fun onUnbind(intent: Intent?): Boolean {
+        hideOverlay()
+        if (::state.isInitialized && state.isActive()) { state.recordTamper(); AccessibilityGuard.tryEnable(this) }
+        return super.onUnbind(intent)
+    }
 }
