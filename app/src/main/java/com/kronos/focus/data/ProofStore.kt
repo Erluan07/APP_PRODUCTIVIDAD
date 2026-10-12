@@ -59,8 +59,9 @@ class ProofStore private constructor(private val ctx: Context) : SQLiteOpenHelpe
         var prev = "GENESIS"
         readableDatabase.rawQuery("SELECT ts, task, kind, file, fileSha, prevHash, hash FROM proofs ORDER BY id", null).use { c ->
             while (c.moveToNext()) {
-                val (ts, task, kind, file, fs, prevHash, hash) = listOf(c.getString(0), c.getString(1), c.getString(2), c.getString(3), c.getString(4), c.getString(5), c.getString(6))
-                if (prevHash != prev || chain(prev, ts.toLong(), task, kind, fs) != hash) return false
+                val ts = c.getLong(0); val task = c.getString(1); val kind = c.getString(2); val file = c.getString(3)
+                val fs = c.getString(4); val prevHash = c.getString(5); val hash = c.getString(6)
+                if (prevHash != prev || chain(prev, ts, task, kind, fs) != hash) return false
                 val f = File(proofDir(ctx), file)
                 if (!f.exists() || fileSha(f) != fs) return false
                 prev = hash
