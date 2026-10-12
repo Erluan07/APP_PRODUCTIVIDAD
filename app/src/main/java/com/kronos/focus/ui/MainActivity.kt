@@ -22,6 +22,12 @@ import com.kronos.focus.data.BunkerStateStore
 import com.kronos.focus.domain.rules.AppRulesConfig
 import com.kronos.focus.services.AccessibilityGuard
 import com.kronos.focus.services.BunkerWatchdogService
+import com.kronos.focus.services.AlarmFlow
+import com.kronos.focus.services.AlarmScheduler
+import com.kronos.focus.data.AlarmStateStore
+import android.app.NotificationManager
+import android.net.Uri
+import android.os.PowerManager
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -32,6 +38,8 @@ import java.util.Locale
  * de prueba de duración fija. En builds DEBUG existe además una salida de emergencia para pruebas.
  */
 class MainActivity : ComponentActivity() {
+    private val camLauncher = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {}
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val store = BunkerStateStore.get(this)
@@ -85,6 +93,30 @@ class MainActivity : ComponentActivity() {
 
             if (BuildConfig.DEBUG && store.remainingMs(now) > 0) {
                 OutlinedButton(onClick = { store.debugClear() }) { Text("Salir del búnker (solo versión de prueba)") }
+            }
+
+            HorizontalDivider()
+            Text("Alarma %02d:%02d (ventana Smart Wake-Up: %d min)".format(AppRulesConfig.ALARM_HOUR, AppRulesConfig.ALARM_MINUTE, AppRulesConfig.SMART_WAKE_WINDOW_MIN),
+                style = MaterialTheme.typography.titleSmall)
+            Text("Código a escanear: ${AppRulesConfig.ALARM_QR_VALUE} · Fase: ${AlarmStateStore.get(this@MainActivity).phase}",
+                style = MaterialTheme.typography.bodySmall)
+            if (checkSelfPermission(Manifest.permission.CAMERA) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                Button(onClick = { camLauncher.launch(Manifest.permission.CAMERA) }) { Text("Dar permiso de cámara (necesario para escanear)") }
+            }
+            if (Build.VERSION.SDK_INT >= 34 && !getSystemService(NotificationManager::class.java).canUseFullScreenIntent()) {
+                Button(onClick = { startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:$packageName"))) }) {
+                    Text("Permitir pantalla completa de alarma")
+                }
+            }
+            if (!getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)) {
+                Button(onClick = { startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName"))) }) {
+                    Text("Excluir de ahorro de batería")
+                }
+            }
+            if (BuildConfig.DEBUG) {
+                OutlinedButton(onClick = { AlarmFlow.ring(this@MainActivity, test = true) }) { Text("[Prueba] Hacer sonar ahora") }
+                OutlinedButton(onClick = { AlarmScheduler.scheduleTest(this@MainActivity, System.currentTimeMillis() + 60_000L) }) { Text("[Prueba] Sonar en 1 minuto (pantalla apagada)") }
+                OutlinedButton(onClick = { AlarmFlow.startCheck(this@MainActivity) }) { Text("[Prueba] Wake-Up Check ahora") }
             }
 
             HorizontalDivider()

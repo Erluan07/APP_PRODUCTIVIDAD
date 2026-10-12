@@ -29,5 +29,11 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
-    // Fases 2-4 (se añaden al implementarlas): ML Kit barcode, CameraX, Room + KSP
+    // Fase 2: escaneo offline (modelo empaquetado) + cámara
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
+    val camerax = "1.4.0"
+    implementation("androidx.camera:camera-camera2:$camerax")
+    implementation("androidx.camera:camera-lifecycle:$camerax")
+    implementation("androidx.camera:camera-view:$camerax")
+    // Fase 4 (pendiente): Room + KSP
 }

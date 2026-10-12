@@ -72,6 +72,20 @@ object AppRulesConfig {
         "com.android.packageinstaller",
     )
 
+    // ---- Alarma (Fase 2). Edita y recompila para cambiarlos. ----
+    const val ALARM_HOUR = 7
+    const val ALARM_MINUTE = 0
+
+    /** Texto que debe contener el QR/Barcode (o la etiqueta NFC de texto) pegado en el baño/cocina. */
+    const val ALARM_QR_VALUE = "KRONOS-BANO-01"
+
+    /** UIDs NFC permitidos en hexadecimal mayúsculas (opcional; también vale una etiqueta NDEF de texto = ALARM_QR_VALUE). */
+    val NFC_UIDS: Set<String> = emptySet()
+
+    /** Smart Wake-Up: delta de aceleración (m/s²) que cuenta como micro-movimiento y nº por época de 30 s. */
+    const val SMART_MOVE_DELTA = 0.15f
+    const val SMART_MOVE_COUNT = 4
+
     // ---- Parámetros de comportamiento ----
     const val WAKE_CHECK_MIN_DELAY_MIN = 7
     const val WAKE_CHECK_MAX_DELAY_MIN = 10

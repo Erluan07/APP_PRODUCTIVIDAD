@@ -22,6 +22,7 @@ import com.kronos.focus.domain.rules.AppRulesConfig
 class BunkerAccessibilityService : AccessibilityService() {
 
     private lateinit var state: BunkerStateStore
+    private lateinit var alarm: com.kronos.focus.data.AlarmStateStore
     private lateinit var windowManager: WindowManager
     private var overlay: TextView? = null
 
@@ -31,6 +32,7 @@ class BunkerAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         state = BunkerStateStore.get(this)
+        alarm = com.kronos.focus.data.AlarmStateStore.get(this)
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         refreshInfrastructurePackages()
     }
@@ -38,6 +40,17 @@ class BunkerAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
+        // Mientras suena la alarma (o hay Wake-Up Check) nada puede estar delante de la pantalla de alarma.
+        if (alarm.uiRequired()) {
+            if (pkg != AppRulesConfig.APP_PACKAGE && pkg !in AppRulesConfig.SYSTEM_ALLOWED) {
+                runCatching {
+                    startActivity(Intent(this, com.kronos.focus.ui.alarm.AlarmActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+                }
+            }
+            lastPackage = pkg
+            return
+        }
         if (!state.isActive()) { hideOverlay(); lastPackage = pkg; return }
 
         if (AppRulesConfig.isAllowed(pkg, launchers, imes)) {
