@@ -1,0 +1,9 @@
+<resources>
+    <!-- Ventana base con los colores del sistema de diseño (claro/oscuro automático). -->
+    <style name="Theme.Kronos" parent="android:Theme.DeviceDefault.DayNight">
+        <item name="android:windowBackground">@color/kronos_background</item>
+        <item name="android:colorPrimary">@color/kronos_primary</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
+</resources>

@@ -71,12 +71,21 @@ class BunkerAccessibilityService : AccessibilityService() {
 
     private fun showOverlay() {
         if (overlay != null) return
+        val sleeping = ::state.isInitialized && state.isSleepMode()
+        val title = if (sleeping) "Modo dormir" else "Modo búnker"
+        val body = if (sleeping) "\nDescansa: esta app está bloqueada hasta tu alarma." else "\nEnfócate: esta app está bloqueada."
         val view = TextView(this).apply {
-            text = "MODO BÚNKER\nEnfócate. Esta app está bloqueada."
-            textSize = 22f
+            text = android.text.SpannableStringBuilder(title + body).apply {
+                setSpan(android.text.style.RelativeSizeSpan(1.7f), 0, title.length, 0)
+                setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 0, title.length, 0)
+            }
+            textSize = 18f
             gravity = Gravity.CENTER
+            setLineSpacing(0f, 1.25f)
+            setPadding(72, 72, 72, 72)
             setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#F2000000"))
+            setBackgroundColor(Color.parseColor("#F5042F2E"))
+            runCatching { typeface = android.graphics.Typeface.create(resources.getFont(com.kronos.focus.R.font.plus_jakarta_sans), android.graphics.Typeface.NORMAL) }
         }
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,

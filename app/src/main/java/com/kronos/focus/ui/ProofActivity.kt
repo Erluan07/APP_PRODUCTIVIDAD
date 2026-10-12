@@ -23,6 +23,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import com.kronos.focus.ui.components.CtaButton
+import com.kronos.focus.ui.components.MutedText
+import com.kronos.focus.ui.components.StatusPill
+import com.kronos.focus.ui.components.Tone
+import com.kronos.focus.ui.theme.KronosTheme
 import com.kronos.focus.data.AgendaStore
 import com.kronos.focus.data.ProofStore
 import com.kronos.focus.data.StatsStore
@@ -39,23 +47,28 @@ class ProofActivity : ComponentActivity() {
     private val camLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { camGranted = it }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val task = intent.getStringExtra(EXTRA_TASK).orEmpty()
         val kind = intent.getStringExtra(EXTRA_KIND).orEmpty()
         camGranted = checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         if (!camGranted) camLauncher.launch(Manifest.permission.CAMERA)
         setContent {
-            MaterialTheme {
-                Surface(Modifier.fillMaxSize()) {
-                    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Evidencia: $task", style = MaterialTheme.typography.titleLarge)
-                        Text("Toma una foto en vivo que muestre que la hiciste. No se puede elegir de la galería.")
+            KronosTheme {
+                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    Column(
+                        Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text("Foto de evidencia", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onBackground)
+                        StatusPill(task, Tone.INFO)
+                        MutedText("Toma una foto en vivo que muestre que la hiciste. No se puede elegir de la galería.")
                         if (camGranted) {
-                            Preview(Modifier.fillMaxWidth().weight(1f))
-                            Button(onClick = { capture(task, kind) }, modifier = Modifier.fillMaxWidth().height(72.dp)) { Text("TOMAR FOTO") }
+                            Box(Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(16.dp))) { Preview(Modifier.fillMaxSize()) }
+                            CtaButton("Tomar foto", { capture(task, kind) }, Modifier.height(64.dp))
                         } else {
-                            Text("Falta el permiso de cámara.")
-                            Button(onClick = { camLauncher.launch(Manifest.permission.CAMERA) }) { Text("Dar permiso de cámara") }
+                            MutedText("Falta el permiso de cámara.")
+                            CtaButton("Dar permiso de cámara", { camLauncher.launch(Manifest.permission.CAMERA) })
                         }
                     }
                 }

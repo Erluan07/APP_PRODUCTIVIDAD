@@ -25,7 +25,18 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.text.input.KeyboardType
 import com.kronos.focus.domain.agenda.AgendaBlock
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import com.kronos.focus.ui.TimeField
+import com.kronos.focus.ui.components.*
+import com.kronos.focus.ui.theme.KronosTheme
+import com.kronos.focus.ui.theme.Palette
 import com.kronos.focus.domain.agenda.AgendaValidator
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -33,7 +44,9 @@ import java.util.Locale
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -54,6 +67,7 @@ class AlarmActivity : ComponentActivity() {
     private val camLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { camGranted = it }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         store = AlarmStateStore.get(this)
         setShowWhenLocked(true)
@@ -65,7 +79,7 @@ class AlarmActivity : ComponentActivity() {
         })
         camGranted = checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         if (!camGranted) camLauncher.launch(Manifest.permission.CAMERA)
-        setContent { MaterialTheme { Surface(Modifier.fillMaxSize()) { Content() } } }
+        setContent { KronosTheme { Content() } }
     }
 
     @Composable
@@ -85,33 +99,59 @@ class AlarmActivity : ComponentActivity() {
             }
         }
         if (phase == AlarmPhase.RITUAL) { Ritual(ritualLeft); return }
-        Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        AlarmBackdrop {
             if (phase == AlarmPhase.CHECK_ACTIVE) {
-                Text("¿SIGUES DESPIERTO?", style = MaterialTheme.typography.headlineLarge)
-                Text("$remaining s", style = MaterialTheme.typography.displayLarge)
-                Button(onClick = { AlarmFlow.confirmAwake(this@AlarmActivity) }, modifier = Modifier.fillMaxWidth().height(96.dp)) {
-                    Text("ESTOY DESPIERTO", style = MaterialTheme.typography.headlineSmall)
-                }
-                Text("Si no respondes, la alarma vuelve a sonar.")
+                Spacer(Modifier.weight(1f))
+                Text("¿Sigues despierto?", style = MaterialTheme.typography.headlineLarge, color = Color.White)
+                Text("$remaining", style = MaterialTheme.typography.displayLarge.copy(fontSize = 96.sp), color = Color.White)
+                Text("segundos para responder", style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.85f))
+                Spacer(Modifier.weight(1f))
+                CtaButton("Estoy despierto", { AlarmFlow.confirmAwake(this@AlarmActivity) }, Modifier.height(72.dp))
+                Text("Si no respondes, la alarma vuelve a sonar.", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f))
             } else {
-                Text("¡DESPIERTA!", style = MaterialTheme.typography.headlineLarge)
-                Text("Levántate y escanea el código del baño/cocina, o acerca la etiqueta NFC.")
+                Text("¡Despierta!", style = MaterialTheme.typography.headlineLarge, color = Color.White)
+                Text(
+                    "Levántate y escanea el código del baño o la cocina, o acerca la etiqueta NFC.",
+                    style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.92f),
+                )
                 if (muteLeft > 0) {
-                    Text("Silencio: $muteLeft s para escanear. Si no escaneas, vuelve el ruido.",
-                        style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Silencio: $muteLeft s para escanear. Si no escaneas, vuelve el ruido.",
+                        style = MaterialTheme.typography.titleMedium, color = Color.White,
+                    )
                 } else {
-                    Button(onClick = { AlarmFlow.muteForScan(this@AlarmActivity) }, modifier = Modifier.fillMaxWidth().height(64.dp)) {
-                        Text("Ya desperté, voy a escanear (silencio ${AppRulesConfig.MUTE_SECONDS} s)")
-                    }
+                    OnDarkButton("Ya desperté, voy a escanear (silencio ${AppRulesConfig.MUTE_SECONDS} s)") { AlarmFlow.muteForScan(this@AlarmActivity) }
                 }
                 if (camGranted) {
-                    Scanner(Modifier.fillMaxWidth().weight(1f)) { value -> onCode(value) }
+                    Box(
+                        Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(16.dp))
+                            .border(2.dp, Color.White.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+                    ) { Scanner(Modifier.fillMaxSize()) { value -> onCode(value) } }
                 } else {
-                    Text("Falta el permiso de cámara: concédelo para escanear.")
-                    Button(onClick = { camLauncher.launch(Manifest.permission.CAMERA) }) { Text("Dar permiso de cámara") }
+                    Text("Falta el permiso de cámara: concédelo para escanear.", style = MaterialTheme.typography.bodyLarge, color = Color.White)
+                    CtaButton("Dar permiso de cámara", { camLauncher.launch(Manifest.permission.CAMERA) })
                 }
             }
         }
+    }
+
+    /** Fondo de la alarma: degradado teal oscuro de la marca, texto blanco de alto contraste. */
+    @Composable
+    private fun AlarmBackdrop(content: @Composable ColumnScope.() -> Unit) {
+        Column(
+            Modifier.fillMaxSize()
+                .background(Brush.verticalGradient(listOf(Palette.Teal950, Palette.Teal800)))
+                .statusBarsPadding().navigationBarsPadding().padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp), content = content,
+        )
+    }
+
+    @Composable
+    private fun OnDarkButton(text: String, onClick: () -> Unit) {
+        OutlinedButton(
+            onClick = onClick, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = MaterialTheme.shapes.medium,
+            border = BorderStroke(1.5.dp, Color.White), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+        ) { Text(text, style = MaterialTheme.typography.labelLarge) }
     }
 
     /** Misión 2: Compromiso Diario. Sin tareas no hay salida; al agotarse el tiempo vuelve la alarma. */
@@ -126,79 +166,109 @@ class AlarmActivity : ComponentActivity() {
         var end by remember { mutableStateOf<Int?>(null) }
         var error by remember { mutableStateOf<String?>(null) }
         val fmt = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
-        Column(Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("COMPROMISO DIARIO", style = MaterialTheme.typography.headlineMedium)
-            Text("Elige tus tareas del día. Las que tienen hora activan el Modo Búnker solas; las que no, las inicias tú. " +
-                "Te quedan ${secondsLeft / 60}:${"%02d".format(secondsLeft % 60)} o vuelve la alarma.")
-            blocks.sortedBy { it.startMs }.forEach { b ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("${fmt.format(Date(b.startMs))}–${fmt.format(Date(b.endMs))}  ${b.name}")
-                    TextButton(onClick = { blocks.remove(b) }) { Text("Quitar") }
+        Column(
+            Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+                .statusBarsPadding().navigationBarsPadding().imePadding()
+                .verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Compromiso diario", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onBackground)
+            StatusPill("Te quedan ${secondsLeft / 60}:${"%02d".format(secondsLeft % 60)}", if (secondsLeft < 120) Tone.WARN else Tone.INFO)
+            MutedText("Elige tus tareas del día. Las que tienen hora activan el Modo Búnker solas; las que no, las inicias tú. Si se acaba el tiempo, vuelve la alarma.")
+
+            AppCard {
+                SectionTitle("Tu día")
+                if (blocks.isEmpty() && flex.isEmpty()) MutedText("Aún no agregas nada.")
+                blocks.sortedBy { it.startMs }.forEach { b ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(b.name, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                            MutedText("${fmt.format(Date(b.startMs))} – ${fmt.format(Date(b.endMs))}")
+                        }
+                        TextAction("Quitar", { blocks.remove(b) })
+                    }
+                }
+                flex.toList().forEach { n ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(n, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                            MutedText("Sin hora")
+                        }
+                        TextAction("Quitar", { flex.remove(n) })
+                    }
                 }
             }
-            flex.toList().forEach { n ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Sin hora: $n")
-                    TextButton(onClick = { flex.remove(n) }) { Text("Quitar") }
-                }
-            }
+
             when (external) {
                 is TaskManagerClient.Result.Ok -> if (external.tasks.isNotEmpty()) {
-                    Text("De Task Manager (pendientes):", style = MaterialTheme.typography.titleSmall)
-                    external.tasks.take(30).forEach { t ->
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("${t.title}  [${t.priority}${t.dueDate?.let { " · $it" } ?: ""}]", modifier = Modifier.weight(1f))
-                            TextButton(onClick = { name = t.title; start = null; end = null; error = null }) { Text("Usar") }
+                    AppCard {
+                        SectionTitle("De Task Manager", "Pendientes de tu app de tareas")
+                        external.tasks.take(30).forEach { t ->
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(t.title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                                    MutedText("Prioridad ${t.priority}" + (t.dueDate?.let { " · $it" } ?: ""))
+                                }
+                                TextAction("Usar", { name = t.title; start = null; end = null; error = null })
+                            }
                         }
                     }
                 }
-                TaskManagerClient.Result.NotAvailable ->
-                    Text("Task Manager no disponible (instala/actualiza esa app).", style = MaterialTheme.typography.bodySmall)
+                TaskManagerClient.Result.NotAvailable -> MutedText("Task Manager no disponible (instala o actualiza esa app).")
             }
+
             if (templates.isNotEmpty()) {
-                Text("Mis tareas (toca Usar y ajusta la hora):", style = MaterialTheme.typography.titleSmall)
-                templates.forEach { t ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(t.label(), modifier = Modifier.weight(1f))
-                        TextButton(onClick = {
-                            name = t.name
-                            start = t.startMin
-                            end = t.endMin
-                            error = null
-                        }) { Text("Usar") }
+                AppCard {
+                    SectionTitle("Mis tareas", "Toca Usar y ajusta la hora si hace falta.")
+                    templates.forEach { t ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(t.name, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                                MutedText(if (t.isTimed) "${t.hm(t.startMin!!)} – ${t.hm(t.endMin!!)}" else "Sin hora")
+                            }
+                            TextAction("Usar", { name = t.name; start = t.startMin; end = t.endMin; error = null })
+                        }
                     }
                 }
             }
-            OutlinedTextField(name, { name = it }, label = { Text("Tarea (ej. Estudiar)") }, modifier = Modifier.fillMaxWidth())
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                TimeField("Inicio", start, { start = it }, Modifier.weight(1f))
-                TimeField("Fin", end, { end = it }, Modifier.weight(1f))
-            }
-            Text("Deja las horas en “--:--” (o toca Sin hora) si no sabes cuándo la harás.", style = MaterialTheme.typography.bodySmall)
-            Button(onClick = {
-                val s = start
-                val e = end
-                when {
-                    name.isBlank() -> error = "Escribe el nombre de la tarea."
-                    s == null && e == null -> {
-                        if (name.trim() !in flex) flex.add(name.trim())
-                        name = ""; error = null
-                    }
-                    s == null || e == null -> error = "Pon inicio y fin, o deja ambos sin hora."
-                    e <= s -> error = "El fin debe ser posterior al inicio."
-                    else -> {
-                        blocks.add(AgendaBlock(name.trim(), AgendaValidator.todayAt(s), AgendaValidator.todayAt(e)))
-                        name = ""; start = null; end = null; error = null
-                    }
+
+            AppCard {
+                SectionTitle("Agregar a mi día")
+                OutlinedTextField(
+                    name, { name = it }, label = { Text("Nombre de la tarea") }, singleLine = true,
+                    shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth(),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    TimeField("Inicio", start, { start = it }, Modifier.weight(1f))
+                    TimeField("Fin", end, { end = it }, Modifier.weight(1f))
                 }
-            }, modifier = Modifier.fillMaxWidth()) { Text("Agregar a mi día") }
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            Button(
-                enabled = blocks.isNotEmpty() || flex.isNotEmpty(),
+                MutedText("Deja las horas en --:-- (o toca Sin hora) si no sabes cuándo la harás.")
+                SoftButton("Agregar a mi día", {
+                    val s = start
+                    val e = end
+                    when {
+                        name.isBlank() -> error = "Escribe el nombre de la tarea."
+                        s == null && e == null -> {
+                            if (name.trim() !in flex) flex.add(name.trim())
+                            name = ""; error = null
+                        }
+                        s == null || e == null -> error = "Pon inicio y fin, o deja ambos sin hora."
+                        e <= s -> error = "El fin debe ser posterior al inicio."
+                        else -> {
+                            blocks.add(AgendaBlock(name.trim(), AgendaValidator.todayAt(s), AgendaValidator.todayAt(e)))
+                            name = ""; start = null; end = null; error = null
+                        }
+                    }
+                }, Modifier.fillMaxWidth())
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
+            }
+
+            CtaButton(
+                "Confirmar compromiso", enabled = blocks.isNotEmpty() || flex.isNotEmpty(),
                 onClick = { error = AlarmFlow.commitAgenda(this@AlarmActivity, blocks.toList(), flex.toList()) },
-                modifier = Modifier.fillMaxWidth().height(72.dp)
-            ) { Text("CONFIRMAR COMPROMISO (no se puede cambiar)") }
+                modifier = Modifier.height(64.dp),
+            )
+            MutedText("Una vez confirmado no se puede cambiar; solo podrás agregar más tareas durante el día.")
         }
     }
 
