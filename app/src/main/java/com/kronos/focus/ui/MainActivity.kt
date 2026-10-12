@@ -30,6 +30,7 @@ import com.kronos.focus.services.BunkerWatchdogService
 import com.kronos.focus.services.AlarmFlow
 import com.kronos.focus.services.AlarmScheduler
 import com.kronos.focus.data.AlarmStateStore
+import com.kronos.focus.admin.DeviceOwnerHardening
 import com.kronos.focus.data.AgendaStore
 import com.kronos.focus.data.ProofStore
 import android.app.NotificationManager
@@ -101,6 +102,13 @@ class MainActivity : ComponentActivity() {
                 Text("Auto-reactivación OFF. Para activarla (desde el PC): " +
                     "adb shell pm grant com.kronos.focus android.permission.WRITE_SECURE_SETTINGS",
                     style = MaterialTheme.typography.bodySmall)
+            }
+            val owner = DeviceOwnerHardening.isOwner(this@MainActivity)
+            DeviceOwnerHardening.sync(this@MainActivity, store.isActive(now))
+            Text("Device Owner: ${if (owner) "ACTIVO (app no desinstalable en búnker)" else "no activado (opcional, ver docs/DEVICE_OWNER.md)"}",
+                style = MaterialTheme.typography.bodySmall)
+            if (BuildConfig.DEBUG && owner) {
+                OutlinedButton(onClick = { DeviceOwnerHardening.release(this@MainActivity) }) { Text("[Prueba] Renunciar a Device Owner") }
             }
             val free = AppRulesConfig.FREE_WINDOWS.joinToString { "%02d:%02d–%02d:%02d".format(it.first / 60, it.first % 60, it.second / 60, it.second % 60) }
             Text("Pausa fija sin búnker: $free", style = MaterialTheme.typography.bodySmall)

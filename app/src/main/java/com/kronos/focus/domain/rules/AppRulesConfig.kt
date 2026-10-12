@@ -86,6 +86,12 @@ object AppRulesConfig {
     const val SMART_MOVE_DELTA = 0.15f
     const val SMART_MOVE_COUNT = 4
 
+    // ---- Device Owner (Fase 5, opcional). Ver docs/DEVICE_OWNER.md ----
+    /** Oculta la barra de estado/ajustes rápidos durante el búnker (solo si la app es Device Owner). */
+    const val DEVICE_OWNER_DISABLE_STATUS_BAR = true
+    /** Impide arrancar en modo seguro durante el búnker. OJO: el modo seguro es tu salida de emergencia. */
+    const val DEVICE_OWNER_BLOCK_SAFE_BOOT = false
+
     // ---- Agenda / Compromiso Diario (Fase 3) ----
     const val AGENDA_MIN_BLOCKS = 1
     const val MIN_BLOCK_MIN = 15L

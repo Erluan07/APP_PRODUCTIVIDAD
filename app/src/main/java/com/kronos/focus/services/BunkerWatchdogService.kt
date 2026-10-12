@@ -11,6 +11,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import com.kronos.focus.R
+import com.kronos.focus.admin.DeviceOwnerHardening
 import com.kronos.focus.data.BunkerStateStore
 import com.kronos.focus.ui.MainActivity
 
@@ -25,6 +26,7 @@ class BunkerWatchdogService : Service() {
 
     private val tick = object : Runnable {
         override fun run() {
+            DeviceOwnerHardening.sync(this@BunkerWatchdogService, store.isActive())
             if (store.remainingMs() <= 0L) { stopSelf(); return }
             if (store.isActive() && !AccessibilityGuard.isEnabled(this@BunkerWatchdogService)) {
                 if (!AccessibilityGuard.tryEnable(this@BunkerWatchdogService)) {

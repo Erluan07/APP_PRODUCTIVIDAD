@@ -45,6 +45,16 @@ class BunkerStateStore private constructor(private val prefs: SharedPreferences,
     /** Penalización por reinicio forzado (solo builds release; ver BootReceiver). */
     fun applyPenalty(minutes: Long) = extendUntil(endsAtMs + minutes * 60_000L)
 
+    /**
+     * Penalización de arranque: se aplica UNA sola vez por arranque (LOCKED_BOOT_COMPLETED y
+     * BOOT_COMPLETED llegan los dos). [bootCount] viene de Settings.Global.BOOT_COUNT.
+     */
+    fun applyBootPenaltyOnce(bootCount: Int, minutes: Long) {
+        if (bootCount == prefs.getInt(KEY_PENALTY_BOOT, -2)) return
+        prefs.edit().putInt(KEY_PENALTY_BOOT, bootCount).apply()
+        if (isActive()) applyPenalty(minutes) else startSession(minutes)
+    }
+
     /** SOLO builds debug: salida de emergencia durante las pruebas. */
     fun debugClear() {
         endsAtMs = 0L
@@ -76,6 +86,7 @@ class BunkerStateStore private constructor(private val prefs: SharedPreferences,
         private const val KEY_RECENT = "recent_packages"
         private const val KEY_BLOCKED = "blocked_count"
         private const val KEY_TAMPER = "tamper_count"
+        private const val KEY_PENALTY_BOOT = "penalty_boot_count"
         @Volatile private var instance: BunkerStateStore? = null
 
         fun get(context: Context): BunkerStateStore = instance ?: synchronized(this) {
