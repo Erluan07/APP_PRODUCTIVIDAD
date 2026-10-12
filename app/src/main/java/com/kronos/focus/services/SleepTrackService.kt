@@ -50,6 +50,7 @@ class SleepTrackService : Service(), SensorEventListener {
     private var micEnabled = false
     private var onsetMs: Long? = null
     private var deadlineMs = 0L
+    private var stamp: String? = null
     private var last = FloatArray(3)
     private var hasLast = false
     @Volatile private var moves = 0
@@ -69,7 +70,7 @@ class SleepTrackService : Service(), SensorEventListener {
             val toDeadline = (deadlineMs - now) / 60_000.0
             val sinceOnset = onsetMs?.let { (now - it) / 60_000.0 }
             if (SleepModel.shouldWake(epochs.toList(), sinceOnset, toDeadline, params)) {
-                AlarmFlow.ring(this@SleepTrackService, smart = true)
+                AlarmFlow.ring(this@SleepTrackService, smart = true, stamp = stamp)
                 return
             }
             if (now > deadlineMs + 120_000L) { stopSelf(); return }
@@ -87,7 +88,9 @@ class SleepTrackService : Service(), SensorEventListener {
         val now = System.currentTimeMillis()
         onsetMs = if (fromUser) now + SLEEP_LATENCY_MIN * 60_000L else null
         SleepLogStore.get(this).setOnset(onsetMs)
-        deadlineMs = AlarmScheduler.nextDeadline(now, AlarmStateStore.get(this).lastRingDay == AlarmScheduler.epochDay())
+        val occ = AlarmScheduler.nextOccurrence(this, now)
+        deadlineMs = occ?.timeMs ?: 0L
+        stamp = occ?.stamp
 
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel("smart", "Despertar inteligente", NotificationManager.IMPORTANCE_LOW))
@@ -100,6 +103,8 @@ class SleepTrackService : Service(), SensorEventListener {
             val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or (if (micEnabled) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0)
             startForeground(3, n, type)
         } else startForeground(3, n)
+        // Sin alarmas activas no hay a qué hora despertarte (se comprueba después de mostrar la notificación).
+        if (occ == null) { stopSelf(); return START_NOT_STICKY }
 
         val hold = ((deadlineMs - now) + 10 * 60_000L).coerceIn(10 * 60_000L, 14 * 3_600_000L)
         wl = getSystemService(PowerManager::class.java).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "kronos:sleeptrack").apply { acquire(hold) }

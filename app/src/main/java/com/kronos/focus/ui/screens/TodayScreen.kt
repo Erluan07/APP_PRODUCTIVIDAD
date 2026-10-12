@@ -88,10 +88,13 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
             }
         }
 
-        val next = AlarmScheduler.nextDeadline(now, AlarmStateStore.get(ctx).lastRingDay == AlarmScheduler.epochDay())
+        val next = AlarmScheduler.nextOccurrence(ctx, now)
         AppCard {
-            IconText(Icons.Filled.Notifications, "Próxima alarma: " + SimpleDateFormat("EEEE HH:mm", Locale("es")).format(Date(next)))
-            MutedText("Despertar inteligente: hasta ${SleepLogStore.get(ctx).params().windowMin} min antes si estás en sueño ligero.")
+            IconText(
+                Icons.Filled.Notifications,
+                if (next == null) "Sin alarmas activas" else "Próxima alarma: " + SimpleDateFormat("EEEE HH:mm", Locale("es")).format(Date(next.timeMs)),
+            )
+            if (next != null) MutedText("Despertar inteligente: hasta ${SleepLogStore.get(ctx).params().windowMin} min antes si estás en sueño ligero.")
         }
 
         AppCard {

@@ -16,14 +16,18 @@ import kotlin.random.Random
 object AlarmFlow {
 
     /** Hora límite o Smart Wake-Up: empieza a sonar. [test] no consume la alarma real del día. */
-    fun ring(ctx: Context, test: Boolean = false, smart: Boolean = false) {
+    fun ring(ctx: Context, test: Boolean = false, smart: Boolean = false, stamp: String? = null) {
         val s = AlarmStateStore.get(ctx)
         if (!test) {
-            if (s.lastRingDay == AlarmScheduler.epochDay()) return
             val now = System.currentTimeMillis()
-            val early = if (smart) ((AlarmScheduler.nextDeadline(now, false) - now) / 60_000L).toInt().coerceAtLeast(0) else 0
+            val occ = AlarmScheduler.nextOccurrence(ctx, now)
+            val key = stamp ?: occ?.stamp
+            if (key != null && s.lastRingStamp == key) return
+            val early = if (smart) (((occ?.timeMs ?: now) - now) / 60_000L).toInt().coerceAtLeast(0) else 0
             SleepLogStore.get(ctx).recordWake(now, early, smart, AlarmScheduler.epochDay())
             SleepTrackService.stop(ctx)
+            BunkerStateStore.get(ctx).endSleep()
+            s.lastRingStamp = key
             s.lastRingDay = AlarmScheduler.epochDay()
             AlarmScheduler.cancelRing(ctx)
             resetMute(s)

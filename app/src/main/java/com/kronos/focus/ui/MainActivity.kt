@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import com.kronos.focus.data.TemplateStore
 import com.kronos.focus.domain.agenda.TaskImport
 import com.kronos.focus.domain.rules.AppRulesConfig
+import com.kronos.focus.services.SleepMode
 import com.kronos.focus.services.SleepTrackService
 import com.kronos.focus.ui.theme.KronosTheme
 
@@ -42,6 +43,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startSleepTracking() {
+        SleepMode.begin(this)
         val needMic = AppRulesConfig.SLEEP_USE_MICROPHONE &&
             checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
         if (needMic) micLauncher.launch(Manifest.permission.RECORD_AUDIO) else SleepTrackService.start(this, fromUser = true)

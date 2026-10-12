@@ -10,7 +10,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.kronos.focus.data.AlarmStateStore
 import com.kronos.focus.data.SleepLogStore
 import com.kronos.focus.domain.rules.AppRulesConfig
 import com.kronos.focus.services.AlarmScheduler
@@ -26,7 +25,8 @@ fun SleepScreen(ctx: Context, now: Long, actions: AppActions) {
     val sleepLog = SleepLogStore.get(ctx)
     val params = sleepLog.params()
     val tracking = SleepTrackService.running
-    val next = AlarmScheduler.nextDeadline(now, AlarmStateStore.get(ctx).lastRingDay == AlarmScheduler.epochDay())
+    val next = AlarmScheduler.nextOccurrence(ctx, now)
+    val sleepingNow = com.kronos.focus.data.BunkerStateStore.get(ctx).isSleepMode(now)
 
     ScreenScaffold("Dormir", "Despertar suave y Modo Dormir") {
         if (sleepLog.pendingRating()) {
@@ -39,10 +39,10 @@ fun SleepScreen(ctx: Context, now: Long, actions: AppActions) {
             }
         }
 
-        if (tracking) {
+        if (tracking || sleepingNow) {
             HeroCard {
-                StatusPill("REGISTRANDO", Tone.INFO)
-                Text("Registrando tu sueño", style = MaterialTheme.typography.titleLarge, color = Color.White)
+                StatusPill(if (sleepingNow) "MODO DORMIR" else "REGISTRANDO", Tone.INFO)
+                Text(if (tracking) "Registrando tu sueño" else "Modo Dormir activo", style = MaterialTheme.typography.titleLarge, color = Color.White)
                 Text(
                     "Acelerómetro" + (if (AppRulesConfig.SLEEP_USE_MICROPHONE) " y volumen del ambiente" else "") +
                         ". Deja el teléfono cargando junto a la cama.",
@@ -51,14 +51,19 @@ fun SleepScreen(ctx: Context, now: Long, actions: AppActions) {
             }
         } else {
             AppCard {
-                SectionTitle("Antes de dormir", "Inicia el registro para que Kronos te despierte en sueño ligero.")
+                SectionTitle("Antes de dormir", "Activa el Modo Dormir hasta tu próxima alarma y registra tu sueño para despertarte en sueño ligero.")
                 CtaButton("Me voy a dormir", { actions.startSleep() }, icon = Icons.Filled.Notifications)
                 MutedText("Deja el teléfono cargando junto a la cama. Del micrófono solo se mide el volumen; no se graba nada.")
             }
         }
 
+        AlarmsCard(ctx, now)
+
         AppCard {
-            IconText(Icons.Filled.Notifications, "Próxima alarma: " + SimpleDateFormat("EEEE HH:mm", Locale("es")).format(Date(next)))
+            IconText(
+                Icons.Filled.Notifications,
+                if (next == null) "Sin alarmas activas" else "Próxima alarma: " + SimpleDateFormat("EEEE HH:mm", Locale("es")).format(Date(next.timeMs)),
+            )
         }
 
         AppCard {
@@ -71,8 +76,8 @@ fun SleepScreen(ctx: Context, now: Long, actions: AppActions) {
         }
 
         AppCard {
-            SectionTitle("Modo Dormir", "Desde las %02d:%02d hasta tu alarma".format(AppRulesConfig.SLEEP_START_MIN / 60, AppRulesConfig.SLEEP_START_MIN % 60))
-            MutedText("Solo Teléfono y Spotify. El resto se bloquea para que no te acuestes con el móvil.")
+            SectionTitle("Modo Dormir", "Lo activas tú con “Me voy a dormir” y termina cuando suena tu alarma.")
+            MutedText("Mientras está activo solo se permiten Teléfono y Spotify, para que no te acuestes con el móvil.")
         }
         Spacer(Modifier.height(4.dp))
     }

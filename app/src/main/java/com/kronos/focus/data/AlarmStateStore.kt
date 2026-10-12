@@ -34,7 +34,12 @@ class AlarmStateStore private constructor(private val prefs: SharedPreferences) 
         get() = prefs.getInt("mute_uses", 0)
         set(v) { prefs.edit().putInt("mute_uses", v).apply() }
 
-    /** Día (epoch-day) en el que ya sonó la alarma real, para no repetirla. */
+    /** Última ocurrencia (alarma + día) que ya sonó, para no repetirla. */
+    var lastRingStamp: String?
+        get() = prefs.getString("last_ring_stamp", null)
+        set(v) { prefs.edit().putString("last_ring_stamp", v).apply() }
+
+    /** Día (epoch-day) en el que ya sonó la alarma real. */
     var lastRingDay: Long
         get() = prefs.getLong("last_ring_day", -1L)
         set(v) { prefs.edit().putLong("last_ring_day", v).apply() }

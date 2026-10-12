@@ -9,7 +9,8 @@ import com.kronos.focus.domain.sleep.SleepParams
 import com.kronos.focus.domain.stats.DayStat
 import com.kronos.focus.domain.stats.StreakCalc
 import com.kronos.focus.domain.rules.AppRulesConfig
-import com.kronos.focus.services.AlarmScheduler
+import com.kronos.focus.domain.alarm.AlarmEntry
+import com.kronos.focus.domain.alarm.AlarmTimes
 import org.junit.Assert.*
 import org.junit.Test
 import java.util.Calendar
@@ -63,17 +64,47 @@ class RulesTest {
         assertNotNull(AgendaValidator.validate(total, base)) // 9 h > máx. total
     }
 
-    @Test fun alarmDeadlinePerDay() {
-        fun cal(day: Int, h: Int, m: Int = 0) = Calendar.getInstance().apply { set(2026, Calendar.OCTOBER, day, h, m, 0); set(Calendar.MILLISECOND, 0) }
-        fun at(c: Calendar): Long { val (h, m) = AppRulesConfig.alarmAt(c.get(Calendar.DAY_OF_WEEK))!!; return Calendar.getInstance().apply { timeInMillis = c.timeInMillis; set(Calendar.HOUR_OF_DAY, h); set(Calendar.MINUTE, m) }.timeInMillis }
-        val monday = cal(12, 6)            // 12-oct-2026 es lunes
-        assertEquals(at(monday), AlarmScheduler.nextDeadline(monday.timeInMillis, false))
-        val mondayLate = cal(12, 23)
-        val tuesday = cal(13, 6)
-        assertEquals(at(tuesday), AlarmScheduler.nextDeadline(mondayLate.timeInMillis, false))
-        assertEquals(at(tuesday), AlarmScheduler.nextDeadline(monday.timeInMillis, true))
-        val fridayLate = cal(16, 23)       // viernes -> sábado
-        assertEquals(Calendar.SATURDAY, Calendar.getInstance().apply { timeInMillis = AlarmScheduler.nextDeadline(fridayLate.timeInMillis, false) }.get(Calendar.DAY_OF_WEEK))
+    private fun cal(day: Int, h: Int, m: Int = 0) = Calendar.getInstance().apply { set(2026, Calendar.OCTOBER, day, h, m, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
+    private val weekdays = AlarmEntry(1, 7, 0, 0b0011111, true, "Trabajo")   // lunes a viernes
+    private val weekend = AlarmEntry(2, 9, 0, 0b1100000, true, "Descanso")   // sábado y domingo
+
+    @Test fun nextAlarmPicksTheRightDayAndTime() {
+        val alarms = listOf(weekdays, weekend)
+        // 12-oct-2026 es lunes
+        assertEquals(cal(12, 7), AlarmTimes.next(alarms, cal(12, 6), null)!!.timeMs)
+        assertEquals(cal(13, 7), AlarmTimes.next(alarms, cal(12, 8), null)!!.timeMs)
+        assertEquals(cal(17, 9), AlarmTimes.next(alarms, cal(16, 23), null)!!.timeMs)   // viernes noche -> sábado 9:00
+        assertEquals(cal(19, 7), AlarmTimes.next(alarms, cal(18, 10), null)!!.timeMs)   // domingo -> lunes 7:00
+    }
+
+    @Test fun ringedOccurrenceIsSkippedAndDisabledIgnored() {
+        val first = AlarmTimes.next(listOf(weekdays), cal(12, 6), null)!!
+        assertEquals(cal(13, 7), AlarmTimes.next(listOf(weekdays), cal(12, 6), first.stamp)!!.timeMs)
+        assertNull(AlarmTimes.next(listOf(weekdays.copy(enabled = false)), cal(12, 6), null))
+        assertNull(AlarmTimes.next(emptyList(), cal(12, 6), null))
+        assertNull(AlarmTimes.next(listOf(weekdays.copy(days = 0)), cal(12, 6), null))
+    }
+
+    @Test fun twoAlarmsSameDayBothRing() {
+        val a = AlarmEntry(1, 7, 0, AlarmTimes.ALL_DAYS, true, "")
+        val b = AlarmEntry(2, 7, 30, AlarmTimes.ALL_DAYS, true, "")
+        val first = AlarmTimes.next(listOf(a, b), cal(12, 6), null)!!
+        assertEquals(1, first.alarm.id)
+        val second = AlarmTimes.next(listOf(a, b), cal(12, 6), first.stamp)!!
+        assertEquals(2, second.alarm.id)
+        assertEquals(cal(12, 7, 30), second.timeMs)
+    }
+
+    @Test fun alarmLockedWhenRingingSoon() {
+        assertTrue(AlarmTimes.isLocked(weekdays, cal(12, 5), null, 3))     // suena en 2 h
+        assertFalse(AlarmTimes.isLocked(weekdays, cal(12, 2), null, 3))    // suena en 5 h
+        assertFalse(AlarmTimes.isLocked(weekdays.copy(enabled = false), cal(12, 5), null, 3))
+    }
+
+    @Test fun daysText() {
+        assertEquals("Todos los días", AlarmTimes.daysText(AlarmTimes.ALL_DAYS))
+        assertEquals("Lunes a viernes", AlarmTimes.daysText(0b0011111))
+        assertEquals("L X V", AlarmTimes.daysText(0b0010101))
     }
 
     @Test fun sleepModeStrictWhitelist() {

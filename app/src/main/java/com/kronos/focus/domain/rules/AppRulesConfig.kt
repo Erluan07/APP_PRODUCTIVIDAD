@@ -1,7 +1,5 @@
 package com.kronos.focus.domain.rules
 
-import java.util.Calendar
-
 /**
  * REGLAS INMUTABLES.
  *
@@ -74,17 +72,12 @@ object AppRulesConfig {
         "com.android.packageinstaller",
     )
 
-    // ---- Alarma (Fase 2). Edita y recompila para cambiarlos. ----
-    /** Hora de la alarma por día (hora, minuto). Devuelve null para no tener alarma ese día. */
-    fun alarmAt(dayOfWeek: Int): Pair<Int, Int>? = when (dayOfWeek) {
-        Calendar.SATURDAY, Calendar.SUNDAY -> 8 to 30
-        else -> 7 to 0
-    }
+    // ---- Alarmas: las configuras en la app (pestaña Dormir). Esto solo fija las reglas de edición. ----
+    /** Una alarma activa que suena en menos de estas horas no se puede cambiar, apagar ni borrar. */
+    const val ALARM_LOCK_HOURS = 3L
 
-    // ---- Modo Dormir: desde SLEEP_START_MIN hasta la alarma del día siguiente solo se permite lo esencial ----
-    const val SLEEP_START_MIN = 22 * 60 + 30
-    /** Fin del Modo Dormir si ese día no hay alarma configurada. */
-    const val SLEEP_FALLBACK_END_MIN = 7 * 60
+    // ---- Modo Dormir: lo activas tú con "Me voy a dormir"; dura hasta tu próxima alarma (tope SLEEP_MAX_HOURS) ----
+    const val SLEEP_MAX_HOURS = 14L
     val SLEEP_WHITELIST: Set<String> = setOf(
         APP_PACKAGE,
         "com.google.android.dialer", "com.android.dialer", "com.samsung.android.dialer",

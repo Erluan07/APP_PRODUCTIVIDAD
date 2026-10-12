@@ -14,32 +14,28 @@ import java.util.Calendar
 class BunkerStateStore private constructor(
     private val prefs: SharedPreferences,
     private val agenda: AgendaStore,
-    private val alarm: AlarmStateStore,
     private val stats: StatsStore,
 ) {
 
     @Volatile private var endsAtMs: Long = prefs.getLong(KEY_ENDS_AT, 0L)
 
-    @Volatile private var sleepOffUntilMs: Long = prefs.getLong(KEY_SLEEP_OFF, 0L)
+    @Volatile private var sleepStartMs: Long = prefs.getLong(KEY_SLEEP_START, 0L)
+    @Volatile private var sleepEndMs: Long = prefs.getLong(KEY_SLEEP_END, 0L)
 
     private fun epochDay(ms: Long) = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay()
 
-    /** Modo Dormir: desde la hora de dormir hasta la alarma del día (o hasta que esa alarma ya haya sonado). */
-    fun isSleepMode(now: Long = System.currentTimeMillis()): Boolean {
-        if (now < sleepOffUntilMs) return false
-        val c = Calendar.getInstance().apply { timeInMillis = now }
-        val m = c.get(Calendar.HOUR_OF_DAY) * 60 + c.get(Calendar.MINUTE)
-        if (m >= AppRulesConfig.SLEEP_START_MIN) return true
-        val end = AppRulesConfig.alarmAt(c.get(Calendar.DAY_OF_WEEK))?.let { it.first * 60 + it.second } ?: AppRulesConfig.SLEEP_FALLBACK_END_MIN
-        return m < end && alarm.lastRingDay != epochDay(now)
+    /** Modo Dormir: lo activa el usuario ("Me voy a dormir") y dura hasta su próxima alarma. */
+    fun isSleepMode(now: Long = System.currentTimeMillis()): Boolean = now in sleepStartMs until sleepEndMs
+
+    fun startSleepMode(endMs: Long, now: Long = System.currentTimeMillis()) {
+        sleepStartMs = now; sleepEndMs = endMs
+        prefs.edit().putLong(KEY_SLEEP_START, sleepStartMs).putLong(KEY_SLEEP_END, sleepEndMs).apply()
     }
 
-    private fun sleepEndMs(now: Long): Long {
-        val c = Calendar.getInstance().apply { timeInMillis = now }
-        if (c.get(Calendar.HOUR_OF_DAY) * 60 + c.get(Calendar.MINUTE) >= AppRulesConfig.SLEEP_START_MIN) c.add(Calendar.DAY_OF_YEAR, 1)
-        val end = AppRulesConfig.alarmAt(c.get(Calendar.DAY_OF_WEEK))?.let { it.first * 60 + it.second } ?: AppRulesConfig.SLEEP_FALLBACK_END_MIN
-        c.set(Calendar.HOUR_OF_DAY, end / 60); c.set(Calendar.MINUTE, end % 60); c.set(Calendar.SECOND, 0); c.set(Calendar.MILLISECOND, 0)
-        return c.timeInMillis
+    /** Termina el Modo Dormir (cuando suena la alarma). */
+    fun endSleep() {
+        sleepStartMs = 0L; sleepEndMs = 0L
+        prefs.edit().putLong(KEY_SLEEP_START, 0L).putLong(KEY_SLEEP_END, 0L).apply()
     }
 
     /** Activo si hay un búnker manual, un bloque de la agenda (salvo en la pausa fija) o el Modo Dormir. */
@@ -47,7 +43,7 @@ class BunkerStateStore private constructor(
         ((now < endsAtMs || agenda.activeBlockAt(now) != null) && !inFreeWindow(now)) || isSleepMode(now)
 
     fun remainingMs(now: Long = System.currentTimeMillis()): Long =
-        maxOf(endsAtMs - now, (agenda.activeBlockAt(now)?.endMs ?: 0L) - now, if (isSleepMode(now)) sleepEndMs(now) - now else 0L, 0L)
+        maxOf(endsAtMs - now, (agenda.activeBlockAt(now)?.endMs ?: 0L) - now, if (isSleepMode(now)) sleepEndMs - now else 0L, 0L)
 
     fun inFreeWindow(now: Long = System.currentTimeMillis()): Boolean {
         val c = Calendar.getInstance().apply { timeInMillis = now }
@@ -87,8 +83,8 @@ class BunkerStateStore private constructor(
     /** SOLO builds debug: salida de emergencia durante las pruebas. */
     fun debugClear() {
         endsAtMs = 0L
-        sleepOffUntilMs = System.currentTimeMillis() + 12 * 3_600_000L
-        prefs.edit().putLong(KEY_ENDS_AT, 0L).putLong(KEY_SLEEP_OFF, sleepOffUntilMs).apply()
+        prefs.edit().putLong(KEY_ENDS_AT, 0L).apply()
+        endSleep()
         agenda.clear()
     }
 
@@ -116,14 +112,15 @@ class BunkerStateStore private constructor(
         private const val KEY_RECENT = "recent_packages"
         private const val KEY_BLOCKED = "blocked_count"
         private const val KEY_TAMPER = "tamper_count"
-        private const val KEY_SLEEP_OFF = "sleep_off_until"
+        private const val KEY_SLEEP_START = "sleep_start"
+        private const val KEY_SLEEP_END = "sleep_end"
         private const val KEY_PENALTY_BOOT = "penalty_boot_count"
         @Volatile private var instance: BunkerStateStore? = null
 
         fun get(context: Context): BunkerStateStore = instance ?: synchronized(this) {
             instance ?: run {
                 val dp = context.applicationContext.createDeviceProtectedStorageContext()
-                BunkerStateStore(dp.getSharedPreferences("bunker_state", Context.MODE_PRIVATE), AgendaStore.get(context), AlarmStateStore.get(context), StatsStore.get(context))
+                BunkerStateStore(dp.getSharedPreferences("bunker_state", Context.MODE_PRIVATE), AgendaStore.get(context), StatsStore.get(context))
             }.also { instance = it }
         }
     }
