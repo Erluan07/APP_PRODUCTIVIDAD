@@ -8,6 +8,8 @@ import com.kronos.focus.data.AlarmStateStore
 import com.kronos.focus.domain.rules.AppRulesConfig
 import com.kronos.focus.receivers.AlarmReceiver
 import com.kronos.focus.ui.MainActivity
+import android.net.Uri
+import com.kronos.focus.data.AgendaStore
 import java.time.LocalDate
 import java.util.Calendar
 
@@ -15,6 +17,7 @@ object AlarmScheduler {
     const val ACTION_DEADLINE = "com.kronos.focus.ALARM_DEADLINE"
     const val ACTION_SMART = "com.kronos.focus.ALARM_SMART_START"
     const val ACTION_CHECK = "com.kronos.focus.ALARM_WAKE_CHECK"
+    const val ACTION_BLOCK = "com.kronos.focus.BUNKER_BLOCK_START"
     const val ACTION_TEST = "com.kronos.focus.ALARM_TEST"
 
     fun epochDay(): Long = LocalDate.now().toEpochDay()
@@ -58,6 +61,19 @@ object AlarmScheduler {
 
     fun scheduleTest(ctx: Context, atMs: Long) {
         runCatching { am(ctx).setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMs, pi(ctx, ACTION_TEST)) }
+    }
+
+    /** Programa el arranque del vigilante en cada bloque futuro de la agenda (el bloqueo en sí lo decide la agenda). */
+    fun scheduleBlocks(ctx: Context) {
+        val now = System.currentTimeMillis()
+        AgendaStore.get(ctx).futureStarts(now).forEach { start ->
+            val pi = PendingIntent.getBroadcast(
+                ctx, 0,
+                Intent(ctx, AlarmReceiver::class.java).setAction(ACTION_BLOCK).setData(Uri.parse("kronos://block/$start")),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            runCatching { am(ctx).setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, start, pi) }
+        }
     }
 
     fun cancelRing(ctx: Context) {

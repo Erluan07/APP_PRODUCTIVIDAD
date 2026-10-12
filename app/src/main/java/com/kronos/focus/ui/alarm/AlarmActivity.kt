@@ -20,6 +20,15 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.text.input.KeyboardType
+import com.kronos.focus.domain.agenda.AgendaBlock
+import com.kronos.focus.domain.agenda.AgendaValidator
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -61,15 +70,18 @@ class AlarmActivity : ComponentActivity() {
         var phase by remember { mutableStateOf(store.phase) }
         var remaining by remember { mutableLongStateOf(0L) }
         var muteLeft by remember { mutableLongStateOf(0L) }
+        var ritualLeft by remember { mutableLongStateOf(0L) }
         LaunchedEffect(Unit) {
             while (true) {
                 phase = store.phase
+                ritualLeft = ((store.ritualDeadlineMs - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
                 muteLeft = ((store.muteUntilMs - System.currentTimeMillis() + 999) / 1000).coerceAtLeast(0)
                 remaining = ((store.checkDeadlineMs - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
                 if (!store.uiRequired()) { finish(); break }
                 delay(250)
             }
         }
+        if (phase == AlarmPhase.RITUAL) { Ritual(ritualLeft); return }
         Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             if (phase == AlarmPhase.CHECK_ACTIVE) {
                 Text("¿SIGUES DESPIERTO?", style = MaterialTheme.typography.headlineLarge)
@@ -96,6 +108,55 @@ class AlarmActivity : ComponentActivity() {
                     Button(onClick = { camLauncher.launch(Manifest.permission.CAMERA) }) { Text("Dar permiso de cámara") }
                 }
             }
+        }
+    }
+
+    /** Misión 2: Compromiso Diario. Sin tareas no hay salida; al agotarse el tiempo vuelve la alarma. */
+    @Composable
+    private fun Ritual(secondsLeft: Long) {
+        val blocks = remember { mutableStateListOf<AgendaBlock>() }
+        var name by remember { mutableStateOf("") }
+        var start by remember { mutableStateOf("") }
+        var end by remember { mutableStateOf("") }
+        var error by remember { mutableStateOf<String?>(null) }
+        val fmt = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+        Column(Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("COMPROMISO DIARIO", style = MaterialTheme.typography.headlineMedium)
+            Text("Escribe los bloques de tu día. Cada uno activará el Modo Búnker. " +
+                "Te quedan ${secondsLeft / 60}:${"%02d".format(secondsLeft % 60)} o vuelve la alarma.")
+            blocks.sortedBy { it.startMs }.forEach { b ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("${fmt.format(Date(b.startMs))}–${fmt.format(Date(b.endMs))}  ${b.name}")
+                    TextButton(onClick = { blocks.remove(b) }) { Text("Quitar") }
+                }
+            }
+            OutlinedTextField(name, { name = it }, label = { Text("Tarea (ej. Estudiar)") }, modifier = Modifier.fillMaxWidth())
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(start, { start = it }, label = { Text("Inicio (0800)") }, modifier = Modifier.weight(1f),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
+                OutlinedTextField(end, { end = it }, label = { Text("Fin (1000)") }, modifier = Modifier.weight(1f),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
+            }
+            Button(onClick = {
+                val s = AgendaValidator.parseHm(start)
+                val e = AgendaValidator.parseHm(end)
+                when {
+                    name.isBlank() -> error = "Escribe el nombre de la tarea."
+                    s == null || e == null -> error = "Hora inválida. Usa formato 24 h, ej. 0800 o 16:30."
+                    e <= s -> error = "El fin debe ser posterior al inicio."
+                    else -> {
+                        blocks.add(AgendaBlock(name.trim(), AgendaValidator.todayAt(s), AgendaValidator.todayAt(e)))
+                        name = ""; start = ""; end = ""; error = null
+                    }
+                }
+            }, modifier = Modifier.fillMaxWidth()) { Text("Agregar bloque") }
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            Button(
+                enabled = blocks.isNotEmpty(),
+                onClick = { error = AlarmFlow.commitAgenda(this@AlarmActivity, blocks.toList()) },
+                modifier = Modifier.fillMaxWidth().height(72.dp)
+            ) { Text("CONFIRMAR COMPROMISO (no se puede cambiar)") }
         }
     }
 

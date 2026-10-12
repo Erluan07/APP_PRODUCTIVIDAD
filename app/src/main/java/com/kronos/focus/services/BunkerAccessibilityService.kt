@@ -42,7 +42,7 @@ class BunkerAccessibilityService : AccessibilityService() {
         val pkg = event.packageName?.toString() ?: return
         // Mientras suena la alarma (o hay Wake-Up Check) nada puede estar delante de la pantalla de alarma.
         if (alarm.uiRequired()) {
-            if (pkg != AppRulesConfig.APP_PACKAGE && pkg !in AppRulesConfig.SYSTEM_ALLOWED) {
+            if (pkg != AppRulesConfig.APP_PACKAGE && pkg !in AppRulesConfig.SYSTEM_ALLOWED && pkg !in imes) {
                 runCatching {
                     startActivity(Intent(this, com.kronos.focus.ui.alarm.AlarmActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))

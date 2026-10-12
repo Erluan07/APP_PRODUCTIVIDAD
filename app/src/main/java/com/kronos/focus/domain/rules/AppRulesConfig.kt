@@ -86,6 +86,12 @@ object AppRulesConfig {
     const val SMART_MOVE_DELTA = 0.15f
     const val SMART_MOVE_COUNT = 4
 
+    // ---- Agenda / Compromiso Diario (Fase 3) ----
+    const val AGENDA_MIN_BLOCKS = 1
+    const val MIN_BLOCK_MIN = 15L
+    /** Tiempo para completar el ritual tras escanear; si se agota, vuelve la alarma completa. */
+    const val RITUAL_TIMEOUT_MIN = 10L
+
     /** Silencio temporal al pulsar "Ya desperté, voy a escanear". Si no escaneas a tiempo, vuelve a sonar. */
     const val MUTE_SECONDS = 25
     /** Veces que se puede pedir el silencio por alarma (Int.MAX_VALUE = sin límite). */

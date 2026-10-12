@@ -25,6 +25,7 @@ import com.kronos.focus.services.BunkerWatchdogService
 import com.kronos.focus.services.AlarmFlow
 import com.kronos.focus.services.AlarmScheduler
 import com.kronos.focus.data.AlarmStateStore
+import com.kronos.focus.data.AgendaStore
 import android.app.NotificationManager
 import android.net.Uri
 import android.os.PowerManager
@@ -96,6 +97,15 @@ class MainActivity : ComponentActivity() {
             }
 
             HorizontalDivider()
+            Text("Agenda de hoy (fija tras el ritual)", style = MaterialTheme.typography.titleSmall)
+            val agendaFmt = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+            val agenda = AgendaStore.get(this@MainActivity).blocks()
+            if (agenda.isEmpty()) Text("Sin agenda confirmada.", style = MaterialTheme.typography.bodySmall)
+            agenda.forEach {
+                val state = when { now >= it.endMs -> "✔"; now >= it.startMs -> "▶ búnker"; else -> "⏳" }
+                Text("${agendaFmt.format(Date(it.startMs))}–${agendaFmt.format(Date(it.endMs))}  ${it.name}  $state", style = MaterialTheme.typography.bodySmall)
+            }
+            HorizontalDivider()
             Text("Alarma %02d:%02d (ventana Smart Wake-Up: %d min)".format(AppRulesConfig.ALARM_HOUR, AppRulesConfig.ALARM_MINUTE, AppRulesConfig.SMART_WAKE_WINDOW_MIN),
                 style = MaterialTheme.typography.titleSmall)
             Text("Código a escanear: ${AppRulesConfig.ALARM_QR_VALUE} · Fase: ${AlarmStateStore.get(this@MainActivity).phase}",
@@ -117,6 +127,7 @@ class MainActivity : ComponentActivity() {
                 OutlinedButton(onClick = { AlarmFlow.ring(this@MainActivity, test = true) }) { Text("[Prueba] Hacer sonar ahora") }
                 OutlinedButton(onClick = { AlarmScheduler.scheduleTest(this@MainActivity, System.currentTimeMillis() + 60_000L) }) { Text("[Prueba] Sonar en 1 minuto (pantalla apagada)") }
                 OutlinedButton(onClick = { AlarmFlow.startCheck(this@MainActivity) }) { Text("[Prueba] Wake-Up Check ahora") }
+                OutlinedButton(onClick = { AgendaStore.get(this@MainActivity).clear() }) { Text("[Prueba] Borrar agenda de hoy") }
             }
 
             HorizontalDivider()

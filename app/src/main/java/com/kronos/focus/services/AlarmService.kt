@@ -44,6 +44,7 @@ class AlarmService : Service() {
             if (!store.uiRequired()) { shutdown(); return }
             val now = System.currentTimeMillis()
             if (store.phase == AlarmPhase.CHECK_ACTIVE && now > store.checkDeadlineMs) AlarmFlow.escalate(this@AlarmService)
+            if (store.phase == AlarmPhase.RITUAL && now > store.ritualDeadlineMs) AlarmFlow.escalateRitual(this@AlarmService)
             enforceVolume()
             syncSound()
             if (!AlarmActivity.visible && now - lastLaunch > 2_500L) { lastLaunch = now; launchUi() }
@@ -111,7 +112,8 @@ class AlarmService : Service() {
 
     /** Suena salvo durante el silencio temporal ("voy a escanear"); al expirar, reanuda solo. */
     private fun syncSound() {
-        val muted = store.phase == AlarmPhase.RINGING && System.currentTimeMillis() < store.muteUntilMs
+        val phase = store.phase
+        val muted = phase == AlarmPhase.RITUAL || (phase == AlarmPhase.RINGING && System.currentTimeMillis() < store.muteUntilMs)
         if (muted) pauseSound() else resumeSound()
     }
 

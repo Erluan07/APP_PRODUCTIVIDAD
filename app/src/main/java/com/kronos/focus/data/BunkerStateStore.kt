@@ -9,13 +9,16 @@ import java.util.Calendar
  * Estado del Modo Búnker en almacenamiento *device-protected* (accesible en Direct Boot).
  * No expone cancelación: solo se puede extender (con tope). [debugClear] solo lo llama la UI en builds debug.
  */
-class BunkerStateStore private constructor(private val prefs: SharedPreferences) {
+class BunkerStateStore private constructor(private val prefs: SharedPreferences, private val agenda: AgendaStore) {
 
     @Volatile private var endsAtMs: Long = prefs.getLong(KEY_ENDS_AT, 0L)
 
-    fun isActive(now: Long = System.currentTimeMillis()): Boolean = now < endsAtMs && !inFreeWindow(now)
+    /** Activo si hay un búnker manual en curso o un bloque de la agenda del día, salvo en la pausa fija. */
+    fun isActive(now: Long = System.currentTimeMillis()): Boolean =
+        (now < endsAtMs || agenda.activeBlockAt(now) != null) && !inFreeWindow(now)
 
-    fun remainingMs(now: Long = System.currentTimeMillis()): Long = (endsAtMs - now).coerceAtLeast(0)
+    fun remainingMs(now: Long = System.currentTimeMillis()): Long =
+        maxOf(endsAtMs - now, (agenda.activeBlockAt(now)?.endMs ?: 0L) - now, 0L)
 
     fun inFreeWindow(now: Long = System.currentTimeMillis()): Boolean {
         val c = Calendar.getInstance().apply { timeInMillis = now }
@@ -46,6 +49,7 @@ class BunkerStateStore private constructor(private val prefs: SharedPreferences)
     fun debugClear() {
         endsAtMs = 0L
         prefs.edit().putLong(KEY_ENDS_AT, 0L).apply()
+        agenda.clear()
     }
 
     // ---- Diagnóstico / registro de intentos ----
@@ -77,7 +81,7 @@ class BunkerStateStore private constructor(private val prefs: SharedPreferences)
         fun get(context: Context): BunkerStateStore = instance ?: synchronized(this) {
             instance ?: run {
                 val dp = context.applicationContext.createDeviceProtectedStorageContext()
-                BunkerStateStore(dp.getSharedPreferences("bunker_state", Context.MODE_PRIVATE))
+                BunkerStateStore(dp.getSharedPreferences("bunker_state", Context.MODE_PRIVATE), AgendaStore.get(context))
             }.also { instance = it }
         }
     }
