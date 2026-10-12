@@ -78,4 +78,13 @@ class RulesTest {
         assertEquals(listOf("Lavar platos", "Ir al gym", "Llamar"), TaskImport.parse("- Lavar platos\n* Ir al gym\n1. Llamar\n- [x] Hecha\n\n"))
         assertTrue(TaskImport.parse("").isEmpty())
     }
+
+    @Test fun additionsOnlyAddWithoutOverlapOrExceedingTotal() {
+        val existing = listOf(block("A", 8, 0, 10, 0))
+        assertNull(AgendaValidator.validateAddition(existing, block("B", 11, 0, 12, 0), base))
+        assertNotNull(AgendaValidator.validateAddition(existing, block("B", 9, 30, 11, 0), base)) // solape
+        assertNotNull(AgendaValidator.validateAddition(existing, block("B", 11, 0, 11, 5), base)) // muy corto
+        val big = listOf(block("X", 6, 30, 10, 30), block("Y", 11, 0, 15, 0))
+        assertNotNull(AgendaValidator.validateAddition(big, block("Z", 15, 30, 19, 30), base)) // >8 h en total
+    }
 }

@@ -25,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.text.input.KeyboardType
 import com.kronos.focus.domain.agenda.AgendaBlock
+import com.kronos.focus.ui.TimeField
 import com.kronos.focus.domain.agenda.AgendaValidator
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -121,8 +122,8 @@ class AlarmActivity : ComponentActivity() {
         val templates = remember { TemplateStore.get(this@AlarmActivity).all() }
         val external = remember { TaskManagerClient.pending(this@AlarmActivity) }
         var name by remember { mutableStateOf("") }
-        var start by remember { mutableStateOf("") }
-        var end by remember { mutableStateOf("") }
+        var start by remember { mutableStateOf<Int?>(null) }
+        var end by remember { mutableStateOf<Int?>(null) }
         var error by remember { mutableStateOf<String?>(null) }
         val fmt = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
         Column(Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()),
@@ -148,7 +149,7 @@ class AlarmActivity : ComponentActivity() {
                     external.tasks.take(30).forEach { t ->
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("${t.title}  [${t.priority}${t.dueDate?.let { " · $it" } ?: ""}]", modifier = Modifier.weight(1f))
-                            TextButton(onClick = { name = t.title; start = ""; end = ""; error = null }) { Text("Usar") }
+                            TextButton(onClick = { name = t.title; start = null; end = null; error = null }) { Text("Usar") }
                         }
                     }
                 }
@@ -162,8 +163,8 @@ class AlarmActivity : ComponentActivity() {
                         Text(t.label(), modifier = Modifier.weight(1f))
                         TextButton(onClick = {
                             name = t.name
-                            start = t.startMin?.let { "%02d%02d".format(it / 60, it % 60) } ?: ""
-                            end = t.endMin?.let { "%02d%02d".format(it / 60, it % 60) } ?: ""
+                            start = t.startMin
+                            end = t.endMin
                             error = null
                         }) { Text("Usar") }
                     }
@@ -171,26 +172,24 @@ class AlarmActivity : ComponentActivity() {
             }
             OutlinedTextField(name, { name = it }, label = { Text("Tarea (ej. Estudiar)") }, modifier = Modifier.fillMaxWidth())
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(start, { start = it }, label = { Text("Inicio (0800)") }, modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
-                OutlinedTextField(end, { end = it }, label = { Text("Fin (1000)") }, modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
+                TimeField("Inicio", start, { start = it }, Modifier.weight(1f))
+                TimeField("Fin", end, { end = it }, Modifier.weight(1f))
             }
-            Text("Deja inicio y fin vacíos si no sabes cuándo la harás.", style = MaterialTheme.typography.bodySmall)
+            Text("Deja las horas en “--:--” (o toca Sin hora) si no sabes cuándo la harás.", style = MaterialTheme.typography.bodySmall)
             Button(onClick = {
-                val s = AgendaValidator.parseHm(start)
-                val e = AgendaValidator.parseHm(end)
+                val s = start
+                val e = end
                 when {
                     name.isBlank() -> error = "Escribe el nombre de la tarea."
-                    start.isBlank() && end.isBlank() -> {
+                    s == null && e == null -> {
                         if (name.trim() !in flex) flex.add(name.trim())
                         name = ""; error = null
                     }
-                    s == null || e == null -> error = "Pon inicio y fin válidos (24 h, ej. 0800 o 16:30), o deja ambos vacíos."
+                    s == null || e == null -> error = "Pon inicio y fin, o deja ambos sin hora."
                     e <= s -> error = "El fin debe ser posterior al inicio."
                     else -> {
                         blocks.add(AgendaBlock(name.trim(), AgendaValidator.todayAt(s), AgendaValidator.todayAt(e)))
-                        name = ""; start = ""; end = ""; error = null
+                        name = ""; start = null; end = null; error = null
                     }
                 }
             }, modifier = Modifier.fillMaxWidth()) { Text("Agregar a mi día") }

@@ -34,14 +34,24 @@ class AgendaStore private constructor(private val prefs: SharedPreferences) {
     /** Hecha = true. (Fase 4 exigirá foto de evidencia antes de llamar a esto.) */
     fun setFlexDone(name: String, done: Boolean) = saveFlex(flex().map { if (it.name == name) it.copy(done = done) else it })
 
-    fun commit(blocks: List<AgendaBlock>, flexNames: List<String>, epochDay: Long) {
-        saveFlex(flexNames.distinct().map { FlexTask(it) })
+    private fun writeBlocks(blocks: List<AgendaBlock>) {
         val arr = JSONArray()
         blocks.sortedBy { it.startMs }.forEach {
             arr.put(JSONObject().put("n", it.name).put("s", it.startMs).put("e", it.endMs))
         }
-        prefs.edit().putString(KEY_BLOCKS, arr.toString()).putLong(KEY_DAY, epochDay).apply()
+        prefs.edit().putString(KEY_BLOCKS, arr.toString()).apply()
     }
+
+    fun commit(blocks: List<AgendaBlock>, flexNames: List<String>, epochDay: Long) {
+        saveFlex(flexNames.distinct().map { FlexTask(it) })
+        writeBlocks(blocks)
+        prefs.edit().putLong(KEY_DAY, epochDay).apply()
+    }
+
+    /** Solo agrega (durante el día). No existe forma de quitar o editar bloques confirmados. */
+    fun addBlock(b: AgendaBlock) = writeBlocks(blocks() + b)
+
+    fun addFlex(name: String) = saveFlex(flex() + FlexTask(name))
 
     fun activeBlockAt(now: Long): AgendaBlock? = blocks().firstOrNull { now >= it.startMs && now < it.endMs }
 

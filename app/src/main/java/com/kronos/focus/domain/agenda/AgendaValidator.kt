@@ -29,23 +29,44 @@ object AgendaValidator {
         return x.get(Calendar.YEAR) == y.get(Calendar.YEAR) && x.get(Calendar.DAY_OF_YEAR) == y.get(Calendar.DAY_OF_YEAR)
     }
 
+    private fun minutes(b: AgendaBlock) = (b.endMs - b.startMs) / 60_000
+
+    /** Reglas de un bloque por sí solo. */
+    private fun checkBlock(b: AgendaBlock, now: Long): String? {
+        if (b.name.isBlank()) return "Todo bloque necesita un nombre."
+        val min = minutes(b)
+        if (min <= 0) return "\"${b.name}\": el fin debe ser posterior al inicio."
+        if (min < AppRulesConfig.MIN_BLOCK_MIN) return "\"${b.name}\" dura menos de ${AppRulesConfig.MIN_BLOCK_MIN} min."
+        if (min > AppRulesConfig.MAX_SINGLE_BUNKER_MIN) return "\"${b.name}\" supera el máximo de ${AppRulesConfig.MAX_SINGLE_BUNKER_MIN} min por bloque."
+        if (!sameDay(b.startMs, b.endMs)) return "\"${b.name}\" debe terminar el mismo día."
+        if (b.endMs <= now + 5 * 60_000L) return "\"${b.name}\" ya terminó o termina en menos de 5 min."
+        return null
+    }
+
     /** Devuelve un mensaje de error o null si la agenda es válida. */
     fun validate(blocks: List<AgendaBlock>, now: Long, flexCount: Int = 0): String? {
         if (blocks.size + flexCount < AppRulesConfig.AGENDA_MIN_BLOCKS) return "Agrega al menos una tarea (con o sin hora)."
         val sorted = blocks.sortedBy { it.startMs }
         var total = 0L
         for ((i, b) in sorted.withIndex()) {
-            if (b.name.isBlank()) return "Todo bloque necesita un nombre."
-            val min = (b.endMs - b.startMs) / 60_000
-            if (min <= 0) return "\"${b.name}\": el fin debe ser posterior al inicio."
-            if (min < AppRulesConfig.MIN_BLOCK_MIN) return "\"${b.name}\" dura menos de ${AppRulesConfig.MIN_BLOCK_MIN} min."
-            if (min > AppRulesConfig.MAX_SINGLE_BUNKER_MIN) return "\"${b.name}\" supera el máximo de ${AppRulesConfig.MAX_SINGLE_BUNKER_MIN} min por bloque."
-            if (!sameDay(b.startMs, b.endMs)) return "\"${b.name}\" debe terminar el mismo día."
-            if (b.endMs <= now + 5 * 60_000L) return "\"${b.name}\" ya terminó o termina en menos de 5 min."
+            checkBlock(b, now)?.let { return it }
             if (i > 0 && b.startMs < sorted[i - 1].endMs) return "\"${sorted[i - 1].name}\" y \"${b.name}\" se solapan."
-            total += min
+            total += minutes(b)
         }
         if (total > AppRulesConfig.MAX_TOTAL_BUNKER_MIN) return "Total de búnker del día ($total min) supera el máximo (${AppRulesConfig.MAX_TOTAL_BUNKER_MIN} min)."
+        return null
+    }
+
+    /**
+     * Añadir un bloque a una agenda ya confirmada: solo se puede AGREGAR (nunca quitar ni acortar),
+     * sin solaparse y sin superar el tope total del día.
+     */
+    fun validateAddition(existing: List<AgendaBlock>, b: AgendaBlock, now: Long): String? {
+        checkBlock(b, now)?.let { return it }
+        existing.firstOrNull { b.startMs < it.endMs && b.endMs > it.startMs }
+            ?.let { return "\"${b.name}\" se solapa con \"${it.name}\"." }
+        val total = existing.sumOf { minutes(it) } + minutes(b)
+        if (total > AppRulesConfig.MAX_TOTAL_BUNKER_MIN) return "Con este bloque el día suma $total min de búnker (máximo ${AppRulesConfig.MAX_TOTAL_BUNKER_MIN})."
         return null
     }
 }

@@ -2,18 +2,48 @@ package com.kronos.focus.ui
 
 import android.content.Context
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.kronos.focus.data.AgendaStore
+import com.kronos.focus.data.TaskManagerClient
 import com.kronos.focus.data.TemplateStore
+import com.kronos.focus.domain.agenda.AgendaBlock
 import com.kronos.focus.domain.agenda.AgendaValidator
 import com.kronos.focus.domain.agenda.TaskTemplate
+import com.kronos.focus.services.AgendaActions
 
-/** "Pendientes de hoy" (tareas sin hora) y "Mis tareas" (lista editable e importación). */
+/** Nombre + hora de inicio/fin (selector de reloj). Sin horas = tarea flexible. */
+@Composable
+private fun TaskForm(button: String, onSubmit: (String, Int?, Int?) -> String?) {
+    var name by remember { mutableStateOf("") }
+    var start by remember { mutableStateOf<Int?>(null) }
+    var end by remember { mutableStateOf<Int?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        OutlinedTextField(name, { name = it }, label = { Text("Nombre de la tarea") }, modifier = Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TimeField("Inicio", start, { start = it }, Modifier.weight(1f))
+            TimeField("Fin", end, { end = it }, Modifier.weight(1f))
+        }
+        Text("Sin hora = tarea flexible (no sabes cuándo ni cuánto).", style = MaterialTheme.typography.bodySmall)
+        Button(onClick = {
+            val s = start; val e = end
+            val err = when {
+                name.isBlank() -> "Escribe el nombre."
+                (s == null) != (e == null) -> "Pon inicio y fin, o deja ambos sin hora."
+                s != null && e != null && e <= s -> "El fin debe ser posterior al inicio."
+                else -> onSubmit(name.trim(), s, e)
+            }
+            error = err
+            if (err == null) { name = ""; start = null; end = null }
+        }) { Text(button) }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+    }
+}
+
+/** "Pendientes de hoy", "Agregar al día" y "Mis tareas" (lista editable, importación, Task Manager). */
 @Composable
 fun TasksSection(
     ctx: Context,
@@ -27,11 +57,12 @@ fun TasksSection(
     val templates = TemplateStore.get(ctx)
     var tick by remember { mutableIntStateOf(0) }
     var picking by remember { mutableStateOf<String?>(null) }
-    var name by remember { mutableStateOf("") }
-    var start by remember { mutableStateOf("") }
-    var end by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf<String?>(null) }
+    var msg by remember { mutableStateOf<String?>(null) }
     @Suppress("UNUSED_EXPRESSION") now; tick
+
+    fun addToday(t: TaskTemplate): String? =
+        if (t.isTimed) AgendaActions.addBlock(ctx, AgendaBlock(t.name, AgendaValidator.todayAt(t.startMin!!), AgendaValidator.todayAt(t.endMin!!)))
+        else AgendaActions.addFlex(ctx, t.name)
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Pendientes de hoy (sin hora)", style = MaterialTheme.typography.titleSmall)
@@ -49,38 +80,48 @@ fun TasksSection(
         Text("“Hecha” aún no pide foto de evidencia (llega en la Fase 4).", style = MaterialTheme.typography.bodySmall)
 
         HorizontalDivider()
-        Text("Mis tareas (las eliges en el ritual matutino)", style = MaterialTheme.typography.titleSmall)
+        Text("Agregar una tarea a hoy", style = MaterialTheme.typography.titleSmall)
+        Text("Solo se pueden agregar tareas; las ya confirmadas no se quitan.", style = MaterialTheme.typography.bodySmall)
+        TaskForm("Agregar a mi día") { n, s, e ->
+            if (s == null || e == null) AgendaActions.addFlex(ctx, n)
+            else AgendaActions.addBlock(ctx, AgendaBlock(n, AgendaValidator.todayAt(s), AgendaValidator.todayAt(e)))
+        }
+        msg?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+
+        HorizontalDivider()
+        Text("Mis tareas", style = MaterialTheme.typography.titleSmall)
         val list = templates.all()
         if (list.isEmpty()) Text("Aún no tienes tareas. Agrega o importa.", style = MaterialTheme.typography.bodySmall)
         list.forEach { t ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(t.label(), modifier = Modifier.weight(1f))
+                TextButton(onClick = { msg = addToday(t); tick++ }) { Text("Hoy") }
                 TextButton(onClick = { templates.remove(t.name); tick++ }) { Text("Borrar") }
             }
         }
-        OutlinedTextField(name, { name = it }, label = { Text("Nueva tarea (ej. Gimnasio)") }, modifier = Modifier.fillMaxWidth())
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(start, { start = it }, label = { Text("Inicio (1800)") }, modifier = Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
-            OutlinedTextField(end, { end = it }, label = { Text("Fin (1930)") }, modifier = Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
-        }
-        Text("Sin inicio ni fin = tarea flexible (no sabes cuándo ni cuánto).", style = MaterialTheme.typography.bodySmall)
-        Button(onClick = {
-            val s = AgendaValidator.parseHm(start); val e = AgendaValidator.parseHm(end)
-            when {
-                name.isBlank() -> error = "Escribe el nombre."
-                start.isBlank() && end.isBlank() -> { templates.upsert(TaskTemplate(name.trim())); name = ""; error = null; tick++ }
-                s == null || e == null || e <= s -> error = "Horas inválidas (24 h, fin > inicio) o deja ambas vacías."
-                else -> { templates.upsert(TaskTemplate(name.trim(), s, e)); name = ""; start = ""; end = ""; error = null; tick++ }
-            }
-        }) { Text("Guardar tarea") }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        TaskForm("Guardar en Mis tareas") { n, s, e -> templates.upsert(TaskTemplate(n, s, e)); null }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { onImportFile(); tick++ }) { Text("Importar archivo") }
             OutlinedButton(onClick = { onPaste(); tick++ }) { Text("Pegar del portapapeles") }
         }
-        Text("Importa un .json o .txt exportado de tu app de tareas, o copia la lista y pégala.", style = MaterialTheme.typography.bodySmall)
+
+        HorizontalDivider()
+        Text("De Task Manager (pendientes)", style = MaterialTheme.typography.titleSmall)
+        val tm = remember(tick) { TaskManagerClient.pending(ctx) }
+        when (tm) {
+            is TaskManagerClient.Result.Ok -> {
+                if (tm.tasks.isEmpty()) Text("Sin pendientes.", style = MaterialTheme.typography.bodySmall)
+                tm.tasks.take(30).forEach { t ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("${t.title}  [${t.priority}${t.dueDate?.let { " · $it" } ?: ""}]", modifier = Modifier.weight(1f))
+                        TextButton(onClick = { msg = AgendaActions.addFlex(ctx, t.title); tick++ }) { Text("Hoy") }
+                    }
+                }
+            }
+            TaskManagerClient.Result.NotAvailable ->
+                Text("No conectado (instala la versión de Task Manager con el proveedor).", style = MaterialTheme.typography.bodySmall)
+        }
+        OutlinedButton(onClick = { tick++ }) { Text("Actualizar lista") }
     }
 
     picking?.let { task ->
