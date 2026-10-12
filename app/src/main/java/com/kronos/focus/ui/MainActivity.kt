@@ -72,7 +72,7 @@ class MainActivity : ComponentActivity() {
                 Text("Si Android lo marca como restringido: Ajustes > Apps > Kronos Focus > ⋮ > Permitir ajustes restringidos.",
                     style = MaterialTheme.typography.bodySmall)
             }
-            if (!AccessibilityGuard.canSelfHeal(this)) {
+            if (!AccessibilityGuard.canSelfHeal(this@MainActivity)) {
                 Text("Auto-reactivación OFF. Para activarla (desde el PC): " +
                     "adb shell pm grant com.kronos.focus android.permission.WRITE_SECURE_SETTINGS",
                     style = MaterialTheme.typography.bodySmall)
