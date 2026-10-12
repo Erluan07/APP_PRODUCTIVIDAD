@@ -8,6 +8,7 @@ import android.provider.Settings
 import android.content.ClipboardManager
 import android.widget.Toast
 import com.kronos.focus.data.TemplateStore
+import com.kronos.focus.data.TaskManagerClient
 import com.kronos.focus.domain.agenda.TaskImport
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -128,6 +129,11 @@ class MainActivity : ComponentActivity() {
                 Text("${agendaFmt.format(Date(it.startMs))}–${agendaFmt.format(Date(it.endMs))}  ${it.name}  $state", style = MaterialTheme.typography.bodySmall)
             }
             HorizontalDivider()
+            val tm = TaskManagerClient.pending(this@MainActivity)
+            Text(when (tm) {
+                is TaskManagerClient.Result.Ok -> "Task Manager conectado: ${tm.tasks.size} tareas pendientes."
+                TaskManagerClient.Result.NotAvailable -> "Task Manager: no conectado (instala la versión con el proveedor)."
+            }, style = MaterialTheme.typography.bodySmall)
             TasksSection(
                 ctx = this@MainActivity, now = now, bunkerActive = store.isActive(now),
                 onImportFile = { importLauncher.launch(arrayOf("*/*")) },

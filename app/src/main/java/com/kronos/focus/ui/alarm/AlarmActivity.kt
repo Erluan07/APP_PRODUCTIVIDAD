@@ -41,6 +41,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.kronos.focus.data.AlarmPhase
 import com.kronos.focus.data.AlarmStateStore
 import com.kronos.focus.data.TemplateStore
+import com.kronos.focus.data.TaskManagerClient
 import com.kronos.focus.domain.rules.AppRulesConfig
 import com.kronos.focus.services.AlarmFlow
 import kotlinx.coroutines.delay
@@ -118,6 +119,7 @@ class AlarmActivity : ComponentActivity() {
         val blocks = remember { mutableStateListOf<AgendaBlock>() }
         val flex = remember { mutableStateListOf<String>() }
         val templates = remember { TemplateStore.get(this@AlarmActivity).all() }
+        val external = remember { TaskManagerClient.pending(this@AlarmActivity) }
         var name by remember { mutableStateOf("") }
         var start by remember { mutableStateOf("") }
         var end by remember { mutableStateOf("") }
@@ -139,6 +141,19 @@ class AlarmActivity : ComponentActivity() {
                     Text("Sin hora: $n")
                     TextButton(onClick = { flex.remove(n) }) { Text("Quitar") }
                 }
+            }
+            when (external) {
+                is TaskManagerClient.Result.Ok -> if (external.tasks.isNotEmpty()) {
+                    Text("De Task Manager (pendientes):", style = MaterialTheme.typography.titleSmall)
+                    external.tasks.take(30).forEach { t ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("${t.title}  [${t.priority}${t.dueDate?.let { " · $it" } ?: ""}]", modifier = Modifier.weight(1f))
+                            TextButton(onClick = { name = t.title; start = ""; end = ""; error = null }) { Text("Usar") }
+                        }
+                    }
+                }
+                TaskManagerClient.Result.NotAvailable ->
+                    Text("Task Manager no disponible (instala/actualiza esa app).", style = MaterialTheme.typography.bodySmall)
             }
             if (templates.isNotEmpty()) {
                 Text("Mis tareas (toca Usar y ajusta la hora):", style = MaterialTheme.typography.titleSmall)

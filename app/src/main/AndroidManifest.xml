@@ -41,6 +41,8 @@
         <intent><action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.HOME" /></intent>
         <intent><action android:name="android.intent.action.DIAL" /></intent>
+        <!-- App de tareas (Task Manager IA): proveedor de solo lectura -->
+        <provider android:authorities="com.erluan.taskmanageria.tasks" />
     </queries>
 
     <application
