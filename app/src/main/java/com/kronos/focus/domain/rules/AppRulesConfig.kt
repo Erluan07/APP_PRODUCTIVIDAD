@@ -26,6 +26,8 @@ object AppRulesConfig {
         "com.whatsapp.w4b",
         // 3. Spotify
         "com.spotify.music",
+        // 3b. Task Manager IA (tu app de tareas)
+        "com.erluan.taskmanageria",
         // 4. Emergencias: mensajes y contactos (SMS/llamar a un contacto)
         "com.google.android.apps.messaging",
         "com.samsung.android.messaging",
