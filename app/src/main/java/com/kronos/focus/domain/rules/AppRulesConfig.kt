@@ -38,7 +38,7 @@ object AppRulesConfig {
     )
 
     /** Prefijos permitidos (variantes de la misma app: WhatsApp Business, procesos auxiliares). */
-    val ALLOWED_PREFIXES: List<String> = listOf("com.whatsapp", "com.spotify")
+    val ALLOWED_PREFIXES: List<String> = listOf("com.whatsapp", "com.spotify", "com.bancolombia", "com.todo1.mobile")  // Bancolombia (transferencias)
 
     /** Cualquier paquete de ajustes se bloquea (cubre OEMs con paquetes distintos). */
     val BLOCKED_PREFIXES: List<String> = listOf(
