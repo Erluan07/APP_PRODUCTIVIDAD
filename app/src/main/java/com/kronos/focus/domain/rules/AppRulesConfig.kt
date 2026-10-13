@@ -131,6 +131,26 @@ object AppRulesConfig {
     const val SMART_WAKE_WINDOW_MIN = 25
     const val BOOT_TRAP_PENALTY_MIN = 60L
 
+    /**
+     * Pantallas del sistema que WhatsApp abre al adjuntar/compartir/hacer foto/elegir contacto o
+     * abrir un enlace del chat. Solo se permiten mientras vienes de WhatsApp (ver servicio de bloqueo);
+     * abiertas por su cuenta (desde el launcher) siguen bloqueadas.
+     */
+    val WHATSAPP_HELPERS: Set<String> = setOf(
+        "android", // selector/chooser/diálogos del sistema
+        "com.google.android.gms", "com.google.android.documentsui", "com.android.documentsui",
+        "com.android.providers.media", "com.android.providers.media.module",
+        "com.google.android.providers.media.module",
+        "com.sec.android.app.camera", "com.samsung.android.camera", "com.android.camera", "com.android.camera2",
+        "com.google.android.GoogleCamera", "com.sec.android.gallery3d", "com.samsung.android.gallery3d",
+        "com.google.android.apps.photos", "com.samsung.android.app.contacts", "com.android.contacts",
+        "com.google.android.contacts", "com.samsung.android.dialer",
+        "com.samsung.android.app.smartcapture", "com.sec.android.app.myfiles", "com.samsung.android.provider.filterprovider",
+        "com.samsung.android.mdx", "com.samsung.android.scs", "com.samsung.android.bixby.service",
+        "com.android.vending", "com.android.chrome", "com.sec.android.app.sbrowser",
+        "com.android.intentresolver",
+    )
+
     /** Nombres de paquete que jamás deben bloquearse (llamadas de emergencia). */
     fun isAllowed(pkg: String, launchers: Set<String>, imes: Set<String>, strict: Boolean = false): Boolean =
         pkg !in ALWAYS_BLOCKED_IN_BUNKER &&

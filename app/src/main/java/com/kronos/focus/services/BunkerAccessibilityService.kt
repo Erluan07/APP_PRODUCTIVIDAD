@@ -29,6 +29,8 @@ class BunkerAccessibilityService : AccessibilityService() {
     @Volatile private var launchers: Set<String> = emptySet()
     @Volatile private var imes: Set<String> = emptySet()
     private var lastPackage: String? = null
+    /** true mientras la última app "real" fue WhatsApp: permite sus pantallas auxiliares (adjuntar, cámara, enlaces). */
+    private var fromWhatsApp = false
 
     override fun onServiceConnected() {
         state = BunkerStateStore.get(this)
@@ -54,12 +56,17 @@ class BunkerAccessibilityService : AccessibilityService() {
         }
         if (!state.isActive()) { hideOverlay(); lastPackage = pkg; return }
 
-        if (AppRulesConfig.isAllowed(pkg, launchers, imes, strict = state.isSleepMode())) {
+        val strict = state.isSleepMode()
+        if (!strict && pkg.startsWith("com.whatsapp")) fromWhatsApp = true
+        val helper = !strict && fromWhatsApp && pkg in AppRulesConfig.WHATSAPP_HELPERS
+        if (helper || AppRulesConfig.isAllowed(pkg, launchers, imes, strict = strict)) {
+            if (!helper && !pkg.startsWith("com.whatsapp") && pkg !in AppRulesConfig.SYSTEM_ALLOWED && pkg !in imes) fromWhatsApp = false
             if (pkg != lastPackage) state.recordSeen(pkg, true)
             hideOverlay()
         } else {
             // Los bloqueados se re-bloquean siempre (sin deduplicar) por si el HOME falló.
             state.recordSeen(pkg, false)
+            fromWhatsApp = false
             block(pkg)
         }
         lastPackage = pkg
@@ -74,7 +81,7 @@ class BunkerAccessibilityService : AccessibilityService() {
         if (overlay != null) return
         val sleeping = ::state.isInitialized && state.isSleepMode()
         val title = if (sleeping) "Modo dormir" else "Modo búnker"
-        val body = if (sleeping) "\nDescansa: esta app está bloqueada hasta tu alarma." else "\nEnfócate: esta app está bloqueada."
+        val body = if (sleeping) "\nDescansa: en Modo dormir solo funcionan Teléfono y Spotify (WhatsApp también queda bloqueado) hasta tu alarma." else "\nEnfócate: esta app está bloqueada."
         val view = TextView(this).apply {
             text = android.text.SpannableStringBuilder(title + body).apply {
                 setSpan(android.text.style.RelativeSizeSpan(1.7f), 0, title.length, 0)
