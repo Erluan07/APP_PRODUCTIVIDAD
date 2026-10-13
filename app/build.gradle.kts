@@ -13,6 +13,19 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+        // Compilación de pruebas: conserva la salida de emergencia del búnker y no aplica la penalización de reinicio.
+        // Poner "false" para una versión definitiva.
+        buildConfigField("boolean", "TEST_BUILD", "true")
+    }
+    buildTypes {
+        release {
+            // Optimizada (R8 + sin código de depuración de Compose): mucho más fluida que la versión debug.
+            // Se firma con la clave debug para poder instalarla directamente.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("debug")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {

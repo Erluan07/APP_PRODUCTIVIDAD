@@ -10,7 +10,13 @@ import org.json.JSONObject
 /** Agenda del día confirmada en el ritual matutino. Una vez confirmada no hay API para editarla. */
 class AgendaStore private constructor(private val prefs: SharedPreferences) {
 
-    fun blocks(): List<AgendaBlock> = runCatching {
+    @Volatile private var blocksCache: List<AgendaBlock>? = null
+    @Volatile private var flexCache: List<FlexTask>? = null
+
+    /** Se lee de las preferencias una sola vez (la UI y el servicio de bloqueo lo consultan muchas veces por segundo). */
+    fun blocks(): List<AgendaBlock> = blocksCache ?: readBlocks().also { blocksCache = it }
+
+    private fun readBlocks(): List<AgendaBlock> = runCatching {
         val arr = JSONArray(prefs.getString(KEY_BLOCKS, "[]"))
         (0 until arr.length()).map {
             val o = arr.getJSONObject(it)
@@ -20,7 +26,9 @@ class AgendaStore private constructor(private val prefs: SharedPreferences) {
 
     fun committedDay(): Long = prefs.getLong(KEY_DAY, -1L)
 
-    fun flex(): List<FlexTask> = runCatching {
+    fun flex(): List<FlexTask> = flexCache ?: readFlex().also { flexCache = it }
+
+    private fun readFlex(): List<FlexTask> = runCatching {
         val arr = JSONArray(prefs.getString(KEY_FLEX, "[]"))
         (0 until arr.length()).map { val o = arr.getJSONObject(it); FlexTask(o.getString("n"), o.optBoolean("d", false)) }
     }.getOrDefault(emptyList())
@@ -28,6 +36,7 @@ class AgendaStore private constructor(private val prefs: SharedPreferences) {
     private fun saveFlex(list: List<FlexTask>) {
         val arr = JSONArray()
         list.forEach { arr.put(JSONObject().put("n", it.name).put("d", it.done)) }
+        flexCache = list
         prefs.edit().putString(KEY_FLEX, arr.toString()).apply()
     }
 
@@ -39,6 +48,7 @@ class AgendaStore private constructor(private val prefs: SharedPreferences) {
         blocks.sortedBy { it.startMs }.forEach {
             arr.put(JSONObject().put("n", it.name).put("s", it.startMs).put("e", it.endMs))
         }
+        blocksCache = blocks.sortedBy { it.startMs }
         prefs.edit().putString(KEY_BLOCKS, arr.toString()).apply()
     }
 
@@ -58,7 +68,7 @@ class AgendaStore private constructor(private val prefs: SharedPreferences) {
     fun futureStarts(now: Long): List<Long> = blocks().map { it.startMs }.filter { it > now }
 
     /** Solo builds debug (UI). */
-    fun clear() { prefs.edit().remove(KEY_BLOCKS).remove(KEY_DAY).remove(KEY_FLEX).apply() }
+    fun clear() { blocksCache = emptyList(); flexCache = emptyList(); prefs.edit().remove(KEY_BLOCKS).remove(KEY_DAY).remove(KEY_FLEX).apply() }
 
     companion object {
         private const val KEY_BLOCKS = "blocks"

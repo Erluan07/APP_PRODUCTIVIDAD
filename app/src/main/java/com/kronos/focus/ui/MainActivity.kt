@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import com.kronos.focus.data.TemplateStore
 import com.kronos.focus.domain.agenda.TaskImport
 import com.kronos.focus.domain.rules.AppRulesConfig
+import com.kronos.focus.services.AlarmScheduler
 import com.kronos.focus.services.SleepMode
 import com.kronos.focus.services.SleepTrackService
 import com.kronos.focus.ui.theme.KronosTheme
@@ -44,7 +45,13 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startSleepTracking() {
+        val next = AlarmScheduler.nextOccurrence(this)
+        if (next == null) {
+            Toast.makeText(this, "Primero crea una alarma: el Modo Dormir dura hasta que suene.", Toast.LENGTH_LONG).show()
+            return
+        }
         SleepMode.begin(this)
+        Toast.makeText(this, "Modo Dormir activo: las apps quedan bloqueadas hasta tu alarma.", Toast.LENGTH_LONG).show()
         val needMic = AppRulesConfig.SLEEP_USE_MICROPHONE &&
             checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
         if (needMic) micLauncher.launch(Manifest.permission.RECORD_AUDIO) else SleepTrackService.start(this, fromUser = true)

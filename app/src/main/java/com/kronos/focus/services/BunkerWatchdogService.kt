@@ -13,6 +13,7 @@ import android.os.Looper
 import com.kronos.focus.R
 import com.kronos.focus.admin.DeviceOwnerHardening
 import com.kronos.focus.data.BunkerStateStore
+import com.kronos.focus.domain.rules.AppRulesConfig
 import com.kronos.focus.ui.MainActivity
 
 /**
@@ -28,6 +29,7 @@ class BunkerWatchdogService : Service() {
         override fun run() {
             DeviceOwnerHardening.sync(this@BunkerWatchdogService, store.isActive())
             if (store.remainingMs() <= 0L) { stopSelf(); return }
+            store.pomodoroTransition()?.let { notifyPomodoro(it.focus) }
             if (store.isActive() && !AccessibilityGuard.isEnabled(this@BunkerWatchdogService)) {
                 if (!AccessibilityGuard.tryEnable(this@BunkerWatchdogService)) {
                     if (!warned) { warned = true; store.recordTamper(); notifyTamper() }
@@ -49,6 +51,18 @@ class BunkerWatchdogService : Service() {
             .setContentText("Modo Búnker vigilando")
             .setOngoing(true).build())
         handler.post(tick)
+    }
+
+    /** Pomodoro: solo avisa; el bloqueo de apps sigue igual durante el descanso. */
+    private fun notifyPomodoro(focus: Boolean) {
+        val pi = PendingIntent.getActivity(this, 1, Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val (title, text) = if (focus) "A enfocarse otra vez" to "Terminó el descanso: ${AppRulesConfig.POMODORO_FOCUS_MIN} min de enfoque."
+        else "Descanso de ${AppRulesConfig.POMODORO_BREAK_MIN} min" to "Levántate, estira y toma agua. Las apps siguen bloqueadas."
+        getSystemService(NotificationManager::class.java).notify(3, Notification.Builder(this, ALERT)
+            .setSmallIcon(android.R.drawable.ic_popup_reminder)
+            .setContentTitle(title).setContentText(text)
+            .setContentIntent(pi).setAutoCancel(true).build())
     }
 
     private fun notifyTamper() {

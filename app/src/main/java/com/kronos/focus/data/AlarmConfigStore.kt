@@ -7,11 +7,11 @@ import com.kronos.focus.domain.alarm.AlarmTimes
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Alarmas del usuario (hora, días, activada). La primera vez se crea una de 07:00 todos los días. */
+/** Alarmas del usuario (hora, días, activada). Ya no se crea ninguna por defecto. */
 class AlarmConfigStore private constructor(private val prefs: SharedPreferences) {
 
     fun all(): List<AlarmEntry> {
-        if (!prefs.contains(KEY)) { save(listOf(AlarmEntry(1, 7, 0, AlarmTimes.ALL_DAYS, true, "Predeterminada"))) }
+        dropLegacyDefault()
         return runCatching {
             val arr = JSONArray(prefs.getString(KEY, "[]"))
             (0 until arr.length()).map {
@@ -19,6 +19,24 @@ class AlarmConfigStore private constructor(private val prefs: SharedPreferences)
                 AlarmEntry(o.getInt("id"), o.getInt("h"), o.getInt("m"), o.getInt("d"), o.getBoolean("on"), o.optString("l", ""))
             }
         }.getOrDefault(emptyList())
+    }
+
+    /** Versiones anteriores sembraban una alarma "Predeterminada" 07:00; se elimina una sola vez. */
+    @Synchronized
+    private fun dropLegacyDefault() {
+        if (prefs.getBoolean(KEY_MIGRATED, false)) return
+        prefs.edit().putBoolean(KEY_MIGRATED, true).apply()
+        val raw = prefs.getString(KEY, null) ?: return
+        runCatching {
+            val arr = JSONArray(raw)
+            val keep = JSONArray()
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                val legacy = o.optString("l") == "Predeterminada" && o.getInt("h") == 7 && o.getInt("m") == 0
+                if (!legacy) keep.put(o)
+            }
+            prefs.edit().putString(KEY, keep.toString()).apply()
+        }
     }
 
     private fun save(list: List<AlarmEntry>) {
@@ -40,6 +58,7 @@ class AlarmConfigStore private constructor(private val prefs: SharedPreferences)
 
     companion object {
         private const val KEY = "alarms"
+        private const val KEY_MIGRATED = "legacy_default_removed"
         @Volatile private var instance: AlarmConfigStore? = null
         fun get(context: Context): AlarmConfigStore = instance ?: synchronized(this) {
             instance ?: AlarmConfigStore(

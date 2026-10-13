@@ -16,17 +16,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: "8.10.2" }
       - run: gradle :app:testDebugUnitTest --stacktrace
-      - run: gradle :app:assembleDebug --stacktrace
+      - run: gradle :app:assembleRelease --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: kronos-focus-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/release/app-release.apk
       - name: Publicar APK como Release (descarga directa)
         if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk kronos-focus-debug.apk
+          cp app/build/outputs/apk/release/app-release.apk kronos-focus-debug.apk
           gh release delete debug-latest --cleanup-tag -y || true
           gh release create debug-latest kronos-focus-debug.apk --prerelease --target "${{ github.sha }}" \
             --title "Kronos Focus (debug)" --notes "APK de prueba del commit ${{ github.sha }}"

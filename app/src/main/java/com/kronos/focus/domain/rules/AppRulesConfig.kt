@@ -74,6 +74,10 @@ object AppRulesConfig {
         "com.android.packageinstaller",
     )
 
+    // ---- Pomodoro (opción al iniciar un búnker manual): el bloqueo NO se levanta en el descanso, solo te avisa ----
+    const val POMODORO_FOCUS_MIN = 50L
+    const val POMODORO_BREAK_MIN = 10L
+
     // ---- Alarmas: las configuras en la app (pestaña Dormir). Esto solo fija las reglas de edición. ----
     /** Una alarma activa que suena en menos de estas horas no se puede cambiar, apagar ni borrar. */
     const val ALARM_LOCK_HOURS = 3L

@@ -7,6 +7,9 @@ import java.time.Instant
 import java.time.ZoneId
 import java.util.Calendar
 
+/** Fase del Pomodoro: [focus] = enfoque (true) o descanso (false); [remainingSec] de la fase. */
+data class PomodoroPhase(val focus: Boolean, val remainingSec: Long)
+
 /**
  * Estado del Modo Búnker en almacenamiento *device-protected* (accesible en Direct Boot).
  * No expone cancelación: solo se puede extender (con tope). [debugClear] solo lo llama la UI en builds debug.
@@ -19,6 +22,7 @@ class BunkerStateStore private constructor(
 
     @Volatile private var endsAtMs: Long = prefs.getLong(KEY_ENDS_AT, 0L)
 
+    @Volatile private var pomoStartMs: Long = prefs.getLong(KEY_POMO_START, 0L)
     @Volatile private var sleepStartMs: Long = prefs.getLong(KEY_SLEEP_START, 0L)
     @Volatile private var sleepEndMs: Long = prefs.getLong(KEY_SLEEP_END, 0L)
 
@@ -51,10 +55,40 @@ class BunkerStateStore private constructor(
         return AppRulesConfig.FREE_WINDOWS.any { m >= it.first && m < it.second }
     }
 
-    /** Inicia/alarga un bloque de [minutes] (tope por sesión y tope total). */
-    fun startSession(minutes: Long) {
+    /**
+     * Inicia/alarga un bloque de [minutes] (tope por sesión y tope total). Con [pomodoro] el búnker se
+     * divide en ciclos de 50 min de enfoque + 10 de descanso (solo si no había ya un búnker manual en curso).
+     */
+    fun startSession(minutes: Long, pomodoro: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (now >= endsAtMs) setPomodoro(if (pomodoro) now else 0L)
         val m = minutes.coerceAtMost(AppRulesConfig.MAX_SINGLE_BUNKER_MIN)
-        extendUntil(System.currentTimeMillis() + m * 60_000L)
+        extendUntil(now + m * 60_000L)
+    }
+
+    private fun setPomodoro(startMs: Long) {
+        pomoStartMs = startMs
+        prefs.edit().putLong(KEY_POMO_START, startMs).putInt(KEY_POMO_LAST, -1).apply()
+    }
+
+    private fun pomoCycleMs() = (AppRulesConfig.POMODORO_FOCUS_MIN + AppRulesConfig.POMODORO_BREAK_MIN) * 60_000L
+
+    /** Fase actual del Pomodoro (null si no hay Pomodoro en curso). */
+    fun pomodoroPhase(now: Long = System.currentTimeMillis()): PomodoroPhase? {
+        if (pomoStartMs == 0L || now < pomoStartMs || now >= endsAtMs) return null
+        val pos = (now - pomoStartMs) % pomoCycleMs()
+        val focusMs = AppRulesConfig.POMODORO_FOCUS_MIN * 60_000L
+        return if (pos < focusMs) PomodoroPhase(true, (focusMs - pos) / 1000)
+        else PomodoroPhase(false, (pomoCycleMs() - pos) / 1000)
+    }
+
+    /** Devuelve la fase a anunciar UNA sola vez cuando cambia (enfoque ⇄ descanso); null si no hay cambio. */
+    fun pomodoroTransition(now: Long = System.currentTimeMillis()): PomodoroPhase? {
+        val phase = pomodoroPhase(now) ?: return null
+        val idx = (((now - pomoStartMs) / pomoCycleMs()) * 2 + (if (phase.focus) 0 else 1)).toInt()
+        if (idx == prefs.getInt(KEY_POMO_LAST, -1)) return null
+        prefs.edit().putInt(KEY_POMO_LAST, idx).apply()
+        return if (idx == 0) null else phase
     }
 
     /** Solo alarga, nunca acorta; respeta el tope total. */
@@ -84,6 +118,7 @@ class BunkerStateStore private constructor(
     fun debugClear() {
         endsAtMs = 0L
         prefs.edit().putLong(KEY_ENDS_AT, 0L).apply()
+        setPomodoro(0L)
         endSleep()
         agenda.clear()
     }
@@ -108,6 +143,8 @@ class BunkerStateStore private constructor(
     fun recordTamper() { prefs.edit().putInt(KEY_TAMPER, tamperCount() + 1).apply() }
 
     companion object {
+        private const val KEY_POMO_START = "pomo_start"
+        private const val KEY_POMO_LAST = "pomo_last"
         private const val KEY_ENDS_AT = "bunker_ends_at"
         private const val KEY_RECENT = "recent_packages"
         private const val KEY_BLOCKED = "blocked_count"

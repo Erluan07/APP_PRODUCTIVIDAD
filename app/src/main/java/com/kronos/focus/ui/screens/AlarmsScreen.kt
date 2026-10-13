@@ -50,6 +50,7 @@ private fun DayToggle(letter: String, selected: Boolean, onClick: () -> Unit, mo
 /** Alarmas (lista grande con interruptor, como Google Reloj) + Modo Dormir. Editor en una hoja inferior. */
 @Composable
 fun AlarmsScreen(ctx: Context, now: Long, actions: AppActions) {
+    val refresh = com.kronos.focus.ui.LocalRefresh.current
     val sleepLog = SleepLogStore.get(ctx)
     val params = sleepLog.params()
     val tracking = SleepTrackService.running
@@ -62,7 +63,7 @@ fun AlarmsScreen(ctx: Context, now: Long, actions: AppActions) {
     val alarms = remember(tick, now / 2000) { store.all().sortedBy { it.minutesOfDay } }
     val next = AlarmScheduler.nextOccurrence(ctx, now)
 
-    fun save(a: AlarmEntry) { store.upsert(a); AlarmScheduler.scheduleDaily(ctx); tick++ }
+    fun save(a: AlarmEntry) { store.upsert(a); AlarmScheduler.scheduleDaily(ctx); tick++; refresh() }
     val lockedText = "No se puede cambiar una alarma que suena en menos de ${AppRulesConfig.ALARM_LOCK_HOURS} h."
 
     ScreenScaffold(fab = { AddFab("Alarma", Icons.Filled.Add) { msg = null; editing = AlarmEntry(0, 7, 0, AlarmTimes.ALL_DAYS, true, "") } }) {
@@ -92,7 +93,7 @@ fun AlarmsScreen(ctx: Context, now: Long, actions: AppActions) {
                     "Activa el Modo Dormir hasta tu próxima alarma y registra tu sueño para despertarte en sueño ligero.",
                     style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.92f),
                 )
-                CtaButton("Me voy a dormir", { actions.startSleep() }, icon = Icons.Filled.Notifications)
+                CtaButton("Me voy a dormir", { actions.startSleep(); refresh() }, icon = Icons.Filled.Notifications)
             }
         }
 
@@ -145,7 +146,7 @@ fun AlarmsScreen(ctx: Context, now: Long, actions: AppActions) {
         AlarmEditorSheet(
             e, canDelete = e.id != 0,
             onSave = { save(it); editing = null },
-            onDelete = { store.delete(e.id); AlarmScheduler.scheduleDaily(ctx); tick++; editing = null },
+            onDelete = { store.delete(e.id); AlarmScheduler.scheduleDaily(ctx); tick++; refresh(); editing = null },
             onDismiss = { editing = null },
         )
     }

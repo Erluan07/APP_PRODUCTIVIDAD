@@ -23,7 +23,7 @@ class BootReceiver : BroadcastReceiver() {
         val store = BunkerStateStore.get(context)
         val pendingAlarm = AlarmStateStore.get(context).uiRequired()
         if (store.isActive() || pendingAlarm) {
-            if (!BuildConfig.DEBUG) {
+            if (!BuildConfig.TEST_BUILD) {
                 val boots = Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, -1)
                 store.applyBootPenaltyOnce(boots, AppRulesConfig.BOOT_TRAP_PENALTY_MIN)
             }

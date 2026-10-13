@@ -21,7 +21,9 @@ import com.kronos.focus.admin.DeviceOwnerHardening
 import com.kronos.focus.data.BunkerStateStore
 import com.kronos.focus.services.AccessibilityGuard
 import com.kronos.focus.ui.screens.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 /** Acciones que dependen de la Activity (permisos, selector de archivos, cámara). */
 class AppActions(
@@ -33,6 +35,9 @@ class AppActions(
     val requestCalendar: () -> Unit,
 )
 
+/** Las pantallas la llaman tras cambiar el estado (iniciar búnker, dormir…) para repintar al instante. */
+val LocalRefresh = staticCompositionLocalOf<() -> Unit> { {} }
+
 private data class Tab(val label: String, val icon: ImageVector)
 
 @Composable
@@ -42,13 +47,20 @@ fun AppRoot(actions: AppActions) {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var a11y by remember { mutableStateOf(AccessibilityGuard.isEnabled(ctx)) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val refresh = remember { { now = System.currentTimeMillis() } }
     LaunchedEffect(lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            val store = BunkerStateStore.get(ctx)
             while (true) {
                 now = System.currentTimeMillis()
-                a11y = AccessibilityGuard.isEnabled(ctx)
-                DeviceOwnerHardening.sync(ctx, BunkerStateStore.get(ctx).isActive(now))
-                delay(1000)
+                // Lecturas de Settings y Device Owner fuera del hilo principal para no frenar el dibujado.
+                val enabled = withContext(Dispatchers.Default) {
+                    DeviceOwnerHardening.sync(ctx, store.isActive(now))
+                    AccessibilityGuard.isEnabled(ctx)
+                }
+                if (enabled != a11y) a11y = enabled
+                // Solo hace falta repintar cada segundo cuando hay una cuenta atrás visible; si no, cada 10 s.
+                delay(if (store.isActive(now) && tab == 0) 1000L else 10_000L)
             }
         }
     }
@@ -62,7 +74,7 @@ fun AppRoot(actions: AppActions) {
             NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                 tabs.forEachIndexed { i, t ->
                     NavigationBarItem(
-                        selected = tab == i, onClick = { tab = i },
+                        selected = tab == i, onClick = { tab = i; now = System.currentTimeMillis() },
                         icon = { Icon(t.icon, contentDescription = null) },
                         label = { Text(t.label, style = MaterialTheme.typography.labelMedium) },
                     )
@@ -71,11 +83,13 @@ fun AppRoot(actions: AppActions) {
         },
     ) { pad ->
         Box(Modifier.padding(pad).statusBarsPadding()) {
-            when (tab) {
-                0 -> TodayScreen(ctx, now, a11y, actions)
-                1 -> AlarmsScreen(ctx, now, actions)
-                2 -> TasksScreen(ctx, now, actions)
-                else -> MoreScreen(ctx, now, a11y, actions)
+            CompositionLocalProvider(LocalRefresh provides refresh) {
+                when (tab) {
+                    0 -> TodayScreen(ctx, now, a11y, actions)
+                    1 -> AlarmsScreen(ctx, now, actions)
+                    2 -> TasksScreen(ctx, now, actions)
+                    else -> MoreScreen(ctx, now, a11y, actions)
+                }
             }
         }
     }

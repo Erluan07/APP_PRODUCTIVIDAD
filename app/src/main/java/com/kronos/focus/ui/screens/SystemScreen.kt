@@ -97,7 +97,7 @@ fun SystemSection(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
             recent.forEach { (t, ok, pkg) -> MutedText("${fmt.format(Date(t))}  ${if (ok) "✓" else "✗"}  $pkg") }
         }
 
-        if (BuildConfig.DEBUG) {
+        if (BuildConfig.TEST_BUILD) {
             AppCard {
                 SectionTitle("Herramientas de prueba", "Solo en la versión de prueba (debug).")
                 SoftButton("Hacer sonar la alarma ahora", { AlarmFlow.ring(ctx, test = true) }, Modifier.fillMaxWidth())

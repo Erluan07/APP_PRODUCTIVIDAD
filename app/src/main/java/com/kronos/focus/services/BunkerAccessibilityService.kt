@@ -81,7 +81,8 @@ class BunkerAccessibilityService : AccessibilityService() {
         if (overlay != null) return
         val sleeping = ::state.isInitialized && state.isSleepMode()
         val title = if (sleeping) "Modo dormir" else "Modo búnker"
-        val body = if (sleeping) "\nDescansa: en Modo dormir solo funcionan Teléfono y Spotify (WhatsApp también queda bloqueado) hasta tu alarma." else "\nEnfócate: esta app está bloqueada."
+        val onBreak = !sleeping && ::state.isInitialized && state.pomodoroPhase()?.focus == false
+        val body = if (onBreak) "\nDescanso: estira, camina, toma agua. Las apps siguen bloqueadas." else if (sleeping) "\nDescansa: en Modo dormir solo funcionan Teléfono y Spotify (WhatsApp también queda bloqueado) hasta tu alarma." else "\nEnfócate: esta app está bloqueada."
         val view = TextView(this).apply {
             text = android.text.SpannableStringBuilder(title + body).apply {
                 setSpan(android.text.style.RelativeSizeSpan(1.7f), 0, title.length, 0)

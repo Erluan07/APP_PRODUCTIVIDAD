@@ -25,14 +25,14 @@ import com.kronos.focus.services.AgendaActions
 import com.kronos.focus.services.AlarmScheduler
 import com.kronos.focus.services.AwakeWatchService
 import com.kronos.focus.services.BunkerWatchdogService
+import com.kronos.focus.domain.rules.AppRulesConfig
 import com.kronos.focus.ui.AppActions
+import com.kronos.focus.ui.LocalRefresh
 import com.kronos.focus.ui.ProofActivity
 import com.kronos.focus.ui.components.*
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-
-private const val TEST_BUNKER_MIN = 5L
 
 internal fun fmtHm(ms: Long): String = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(ms))
 
@@ -48,7 +48,9 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
     val store = BunkerStateStore.get(ctx)
     val agenda = AgendaStore.get(ctx)
     val proofs = ProofStore.get(ctx)
+    val refresh = LocalRefresh.current
     var showAdd by remember { mutableStateOf(false) }
+    var showStart by remember { mutableStateOf(false) }
     var picking by remember { mutableStateOf<String?>(null) }
     val active = store.isActive(now)
     val sleeping = store.isSleepMode(now)
@@ -69,13 +71,20 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
             HeroCard {
                 Text(if (sleeping) "Modo Dormir" else "Modo Búnker", style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.9f))
                 Text(fmtCountdown(remainingSec), style = MaterialTheme.typography.displayMedium, color = Color.White)
+                val pomo = if (sleeping) null else store.pomodoroPhase(now)
+                pomo?.let {
+                    Text(
+                        (if (it.focus) "Pomodoro · enfoque " else "Pomodoro · descanso, estira ") + fmtCountdown(it.remainingSec),
+                        style = MaterialTheme.typography.titleMedium, color = Color.White,
+                    )
+                }
                 Text(
-                    if (sleeping) "Solo Teléfono y Spotify hasta tu alarma." else "Permitido: Teléfono, WhatsApp, Spotify, Mensajes y Contactos.",
+                    if (sleeping) "Solo Teléfono y Spotify hasta tu alarma." else "Permitido: Teléfono, WhatsApp, Task Manager IA, Bancolombia, Spotify, Mensajes y Contactos.",
                     style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.92f),
                 )
-                if (BuildConfig.DEBUG) {
+                if (BuildConfig.TEST_BUILD) {
                     TextButton(
-                        onClick = { store.debugClear() }, modifier = Modifier.heightIn(min = 48.dp),
+                        onClick = { store.debugClear(); refresh() }, modifier = Modifier.heightIn(min = 48.dp),
                         colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
                     ) { Text("Salir del búnker (solo versión de prueba)") }
                 }
@@ -84,9 +93,9 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
             HeroCard {
                 Text("Listo para enfocar", style = MaterialTheme.typography.titleLarge, color = Color.White)
                 Text("Tus bloques de agenda activan el búnker solos.", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.92f))
-                CtaButton("Iniciar búnker de $TEST_BUNKER_MIN min", enabled = a11y, onClick = {
-                    store.startSession(TEST_BUNKER_MIN)
-                    BunkerWatchdogService.start(ctx)
+                CtaButton("Iniciar Modo Búnker", enabled = a11y, onClick = { showStart = true })
+                CtaButton("Me voy a dormir (Modo Dormir)", enabled = a11y, icon = Icons.Filled.Notifications, onClick = {
+                    actions.startSleep(); refresh()
                 })
             }
         }
@@ -124,8 +133,10 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
             }
         }
         events.filter { it.allDay }.forEach { MutedText("Todo el día: ${it.title}") }
-        val slots = (events.filter { !it.allDay }.map { Slot(it.title, it.startMs, it.endMs, false) } +
-            agenda.blocks().map { Slot(it.name, it.startMs, it.endMs, true) }).sortedBy { it.startMs }
+        val slots = remember(events, now / 10_000L, showAdd) {
+            (events.filter { !it.allDay }.map { Slot(it.title, it.startMs, it.endMs, false) } +
+                agenda.blocks().map { Slot(it.name, it.startMs, it.endMs, true) }).sortedBy { it.startMs }
+        }
         if (slots.isEmpty()) MutedText("Aún no hay nada en tu agenda. Toca “Tarea” para agregar.")
         var markerShown = false
         slots.forEach { sl ->
@@ -136,9 +147,9 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
                     HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
                 }
             }
-            val proved = sl.isBlock && remember(sl.title, now / 3000) { proofs.hasProofToday(sl.title) }
+            val proved = sl.isBlock && remember(sl.title, now / 10_000L) { proofs.hasProofToday(sl.title) }
             val clash = if (sl.isBlock) CalendarReader.conflicts(events, sl.startMs, sl.endMs).firstOrNull() else null
-            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.width(48.dp)) {
                     Text(fmtHm(sl.startMs), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
                     MutedText(fmtHm(sl.endMs))
@@ -172,7 +183,7 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
         }
 
         // Pendientes sin hora, como lista de verificación
-        val flex = agenda.flex()
+        val flex = remember(now / 10_000L, picking, showAdd) { agenda.flex() }
         if (flex.isNotEmpty()) {
             SectionTitle("Pendientes sin hora", "Pulsa el círculo al terminar (te pide una foto).")
             flex.forEach { f ->
@@ -205,6 +216,18 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
         }
     }
 
+    if (showStart) {
+        BunkerStartDialog(
+            onDismiss = { showStart = false },
+            onStart = { minutes, pomodoro ->
+                store.startSession(minutes, pomodoro)
+                BunkerWatchdogService.start(ctx)
+                showStart = false
+                refresh()
+            },
+        )
+    }
+
     picking?.let { task ->
         AlertDialog(
             onDismissRequest = { picking = null },
@@ -216,6 +239,7 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
                         SoftButton("$m min", {
                             store.startSession(m)
                             BunkerWatchdogService.start(ctx)
+                            refresh()
                             picking = null
                         }, Modifier.fillMaxWidth())
                     }
@@ -224,4 +248,44 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
             confirmButton = { TextAction("Cancelar", { picking = null }) },
         )
     }
+}
+
+/** Elige cuánto dura el búnker (sin tarea asociada) y si se divide en Pomodoros de 50/10. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun BunkerStartDialog(onDismiss: () -> Unit, onStart: (Long, Boolean) -> Unit) {
+    val max = AppRulesConfig.MAX_SINGLE_BUNKER_MIN
+    var minutes by remember { mutableStateOf("60") }
+    var pomodoro by remember { mutableStateOf(false) }
+    val value = minutes.toLongOrNull()
+    val valid = value != null && value in 5..max
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Iniciar Modo Búnker") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                MutedText("Elige cuánto tiempo. Una vez iniciado no se puede cancelar.")
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(25L, 45L, 60L, 90L, 120L, 180L, 240L).forEach { m ->
+                        FilterChip(selected = value == m, onClick = { minutes = m.toString() }, label = { Text(if (m % 60 == 0L) "${m / 60} h" else "$m min") })
+                    }
+                }
+                OutlinedTextField(
+                    minutes, { s -> minutes = s.filter { it.isDigit() }.take(3) }, singleLine = true,
+                    label = { Text("Minutos (5 a $max)") }, isError = !valid,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                    shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth(),
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Pomodoro", style = MaterialTheme.typography.titleSmall)
+                        MutedText("${AppRulesConfig.POMODORO_FOCUS_MIN} min enfocado + ${AppRulesConfig.POMODORO_BREAK_MIN} de descanso. En el descanso solo te aviso para estirar; las apps siguen bloqueadas.")
+                    }
+                    Switch(checked = pomodoro, onCheckedChange = { pomodoro = it })
+                }
+            }
+        },
+        confirmButton = { TextAction("Iniciar", { value?.let { onStart(it, pomodoro) } }, enabled = valid) },
+        dismissButton = { TextAction("Cancelar", onDismiss) },
+    )
 }
