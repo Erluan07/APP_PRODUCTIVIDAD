@@ -42,9 +42,11 @@ fun TaskForm(button: String, onSubmit: (String, Int?, Int?) -> String?, onSucces
 /** Tarea obligatoria: solo nombre + hora de INICIO. Desde esa hora el teléfono se bloquea hasta subir la evidencia. */
 @Composable
 fun MustTaskForm(
-    onSubmit: (String, Int) -> String?, onSuccess: () -> Unit = {},
+    onSubmit: (String, Int, Boolean) -> String?, onSuccess: () -> Unit = {},
     button: String = "Agregar tarea obligatoria", confirmFirst: Boolean = true,
 ) {
+    val modelReady = com.kronos.focus.vision.VisionModel.isReady(androidx.compose.ui.platform.LocalContext.current)
+    var verify by remember { mutableStateOf(modelReady) }
     var name by remember { mutableStateOf("") }
     var start by remember { mutableStateOf<Int?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -56,6 +58,13 @@ fun MustTaskForm(
         )
         TimeField("Hora de inicio", start, { start = it }, Modifier.fillMaxWidth())
         MutedText("Sin hora de fin. A partir de la hora de inicio el teléfono se bloquea hasta que la hagas y subas una foto de evidencia. No se puede cancelar.")
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f)) {
+                Text("Verificar la foto con IA", style = MaterialTheme.typography.titleSmall)
+                MutedText(if (modelReady) "La IA del teléfono comprueba que la foto muestra la tarea." else "Primero carga el modelo en Más → Sistema.")
+            }
+            Switch(checked = verify && modelReady, onCheckedChange = { verify = it }, enabled = modelReady)
+        }
         CtaButton(button, onClick = {
             error = when {
                 name.isBlank() -> "Escribe el nombre."
@@ -65,7 +74,7 @@ fun MustTaskForm(
             if (error == null) {
                 if (confirmFirst) confirm = true
                 else {
-                    val err = onSubmit(name.trim(), start!!)
+                    val err = onSubmit(name.trim(), start!!, verify && modelReady)
                     error = err
                     if (err == null) { name = ""; start = null; onSuccess() }
                 }
@@ -81,7 +90,7 @@ fun MustTaskForm(
             text = { Text("“${name.trim()}” bloqueará el teléfono desde las %02d:%02d hasta que subas la foto de evidencia. No se puede quitar.".format(s / 60, s % 60)) },
             confirmButton = {
                 TextButton(onClick = {
-                    val err = onSubmit(name.trim(), s)
+                    val err = onSubmit(name.trim(), s, verify && modelReady)
                     confirm = false
                     error = err
                     if (err == null) { name = ""; start = null; onSuccess() }

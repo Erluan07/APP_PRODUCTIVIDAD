@@ -236,8 +236,8 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
                     FilterChip(selected = mustMode, onClick = { mustMode = true }, label = { Text("Obligatoria") })
                 }
                 if (mustMode) {
-                    MustTaskForm(onSubmit = { n, startMin ->
-                        AgendaActions.addMust(ctx, n, AgendaValidator.todayAt(startMin)).also { if (it == null) refresh() }
+                    MustTaskForm(onSubmit = { n, startMin, verify ->
+                        AgendaActions.addMust(ctx, n, AgendaValidator.todayAt(startMin), verify).also { if (it == null) refresh() }
                     }, onSuccess = { showAdd = false })
                 } else {
                     MutedText("Solo se pueden agregar tareas; las ya confirmadas no se quitan.")

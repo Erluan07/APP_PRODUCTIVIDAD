@@ -22,10 +22,10 @@ object AgendaActions {
     }
 
     /** Tarea obligatoria: inicio sin fin. Desde esa hora el teléfono queda bloqueado hasta subir la evidencia. */
-    fun addMust(ctx: Context, name: String, startMs: Long): String? {
+    fun addMust(ctx: Context, name: String, startMs: Long, verify: Boolean = false): String? {
         val store = AgendaStore.get(ctx)
         MustRules.validateAdd(store.musts(), name)?.let { return it }
-        store.addMust(MustTask(name.trim(), startMs))
+        store.addMust(MustTask(name.trim(), startMs, verify = verify))
         StatsStore.get(ctx).addTasks(AlarmScheduler.epochDay())
         AlarmScheduler.scheduleBlocks(ctx)
         BunkerWatchdogService.start(ctx)

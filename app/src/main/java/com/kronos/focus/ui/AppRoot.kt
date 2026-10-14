@@ -37,6 +37,7 @@ class AppActions(
     val requestCamera: () -> Unit,
     val requestCalendar: () -> Unit,
     val requestSteps: () -> Unit,
+    val importModel: () -> Unit,
 )
 
 /** Las pantallas la llaman tras cambiar el estado (iniciar búnker, dormir…) para repintar al instante. */

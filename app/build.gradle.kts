@@ -16,6 +16,8 @@ android {
         // Compilación de pruebas: conserva la salida de emergencia del búnker y no aplica la penalización de reinicio.
         // Poner "false" para una versión definitiva.
         buildConfigField("boolean", "TEST_BUILD", "true")
+        // Solo teléfonos de 64 bits: el motor de IA local trae librerías nativas pesadas.
+        ndk { abiFilters += "arm64-v8a" }
     }
     buildTypes {
         release {
@@ -52,5 +54,6 @@ dependencies {
     implementation("androidx.camera:camera-view:$camerax")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20231013")
-    // Fase 4 (pendiente): Room + KSP
+    // Verificación de evidencia con un modelo de visión local (LiteRT-LM)
+    implementation("com.google.ai.edge.litertlm:litertlm-android:latest.release")
 }

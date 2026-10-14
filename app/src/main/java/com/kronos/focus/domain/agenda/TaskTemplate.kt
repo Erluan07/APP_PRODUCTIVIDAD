@@ -1,7 +1,7 @@
 package com.kronos.focus.domain.agenda
 
 /** Tarea de "Mis tareas". Con [startMin]/[endMin] (minutos desde medianoche) es fija; sin ellos, flexible. */
-data class TaskTemplate(val name: String, val startMin: Int? = null, val endMin: Int? = null, val must: Boolean = false) {
+data class TaskTemplate(val name: String, val startMin: Int? = null, val endMin: Int? = null, val must: Boolean = false, val verify: Boolean = false) {
     /** Obligatoria: solo hora de inicio; bloquea el teléfono desde esa hora hasta subir la evidencia. */
     val isMust get() = must && startMin != null
     val isTimed get() = !must && startMin != null && endMin != null

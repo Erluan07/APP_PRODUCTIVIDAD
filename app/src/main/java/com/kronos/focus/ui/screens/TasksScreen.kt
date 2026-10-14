@@ -95,7 +95,7 @@ fun TasksScreen(ctx: Context, now: Long, actions: AppActions) {
                 }
                 if (mustMode) {
                     MutedText("Se guarda como plantilla; al sumarla a hoy bloquea el teléfono desde su hora hasta subir la evidencia.")
-                    MustTaskForm(onSubmit = { n, s -> templates.upsert(TaskTemplate(n, s, null, must = true)); tick++; null }, onSuccess = { showNew = false }, button = "Guardar en Mis tareas", confirmFirst = false)
+                    MustTaskForm(onSubmit = { n, s, v -> templates.upsert(TaskTemplate(n, s, null, must = true, verify = v)); tick++; null }, onSuccess = { showNew = false }, button = "Guardar en Mis tareas", confirmFirst = false)
                 } else {
                     MutedText("Con hora fija (ej. Gimnasio 18:00–19:30) o sin hora.")
                     TaskForm("Guardar en Mis tareas", onSubmit = { n, s, e -> templates.upsert(TaskTemplate(n, s, e)); tick++; null }, onSuccess = { showNew = false })
@@ -110,7 +110,7 @@ fun TasksScreen(ctx: Context, now: Long, actions: AppActions) {
             title = { Text("¿Sumar “${t.name}” a hoy?") },
             text = { Text("Bloqueará el teléfono desde las ${t.hm(t.startMin!!)} (si ya pasó, desde ahora) hasta que subas la foto de evidencia. No se puede cancelar.") },
             confirmButton = {
-                TextAction("Confirmar", { msg = AgendaActions.addMust(ctx, t.name, AgendaValidator.todayAt(t.startMin!!)); confirmMust = null })
+                TextAction("Confirmar", { msg = AgendaActions.addMust(ctx, t.name, AgendaValidator.todayAt(t.startMin!!), t.verify); confirmMust = null })
             },
             dismissButton = { TextAction("Cancelar", { confirmMust = null }) },
         )

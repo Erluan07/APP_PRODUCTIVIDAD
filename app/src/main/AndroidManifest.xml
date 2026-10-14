@@ -74,6 +74,11 @@
 
         <activity android:name=".ui.ProofActivity" android:exported="false" />
 
+        <!-- Analizador de fotos con IA local: en su propio proceso para que un fallo nativo no tumbe el bloqueo -->
+        <service android:name=".vision.VisionService" android:exported="false" android:process=":vision" />
+        <uses-native-library android:name="libvndksupport.so" android:required="false" />
+        <uses-native-library android:name="libOpenCL.so" android:required="false" />
+
         <!-- Cronómetro en pantalla completa y horizontal -->
         <activity android:name=".ui.TimerActivity" android:exported="false"
             android:screenOrientation="sensorLandscape"

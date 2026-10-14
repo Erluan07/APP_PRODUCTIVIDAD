@@ -21,12 +21,12 @@ class AgendaStore private constructor(private val prefs: SharedPreferences) {
 
     private fun readMusts(): List<MustTask> = runCatching {
         val arr = JSONArray(prefs.getString(KEY_MUST, "[]"))
-        (0 until arr.length()).map { val o = arr.getJSONObject(it); MustTask(o.getString("n"), o.getLong("s"), o.optBoolean("d", false)) }
+        (0 until arr.length()).map { val o = arr.getJSONObject(it); MustTask(o.getString("n"), o.getLong("s"), o.optBoolean("d", false), o.optBoolean("v", false)) }
     }.getOrDefault(emptyList())
 
     private fun saveMusts(list: List<MustTask>) {
         val arr = JSONArray()
-        list.forEach { arr.put(JSONObject().put("n", it.name).put("s", it.startMs).put("d", it.done)) }
+        list.forEach { arr.put(JSONObject().put("n", it.name).put("s", it.startMs).put("d", it.done).put("v", it.verify)) }
         mustCache = list
         prefs.edit().putString(KEY_MUST, arr.toString()).apply()
     }

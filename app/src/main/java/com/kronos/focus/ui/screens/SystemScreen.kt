@@ -95,6 +95,20 @@ fun SystemSection(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
         }
 
         AppCard {
+            SectionTitle("Verificación con IA", "Un modelo de visión que corre en tu teléfono, sin internet, para comprobar la foto de las tareas obligatorias.")
+            val ready = com.kronos.focus.vision.VisionModel.isReady(ctx)
+            val pct = com.kronos.focus.vision.VisionModel.progressPercent
+            MutedText(if (ready) "Modelo cargado (${com.kronos.focus.vision.VisionModel.sizeMb(ctx)} MB)." else "Sin modelo. Carga el archivo .litertlm que descargaste (unos 5 GB; necesitas espacio libre para la copia).")
+            if (pct != null) {
+                androidx.compose.material3.LinearProgressIndicator(progress = { pct / 100f }, modifier = Modifier.fillMaxWidth())
+                MutedText("Copiando… $pct %. No cierres la app.")
+            } else {
+                SoftButton(if (ready) "Cargar otro modelo" else "Cargar modelo (.litertlm)", { actions.importModel() }, Modifier.fillMaxWidth())
+            }
+            com.kronos.focus.vision.VisionModel.lastMessage?.let { MutedText(it) }
+        }
+
+        AppCard {
             SectionTitle("Apariencia", "Solo estética: cámbiala cuando quieras para comparar.")
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val cur = com.kronos.focus.ui.theme.UiDesign.current

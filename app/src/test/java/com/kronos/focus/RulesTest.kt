@@ -10,6 +10,7 @@ import com.kronos.focus.domain.stats.DayStat
 import com.kronos.focus.domain.stats.StreakCalc
 import com.kronos.focus.domain.agenda.MustRules
 import com.kronos.focus.domain.agenda.MustTask
+import com.kronos.focus.domain.vision.VerdictParser
 import com.kronos.focus.domain.limits.LimitBlock
 import com.kronos.focus.domain.limits.UsageLimits
 import com.kronos.focus.domain.rules.AppRulesConfig
@@ -164,6 +165,17 @@ class RulesTest {
         assertNotNull(MustRules.validateAdd(list, "  "))
         assertNotNull(MustRules.validateAdd(list, "gimnasio"))                           // repetida y pendiente
         assertNull(MustRules.validateAdd(list, "Hecha"))                                 // una ya hecha se puede volver a pedir
+    }
+
+    @Test fun verdictParserReadsModelAnswers() {
+        assertEquals(true, VerdictParser.parse("SI, se ve a la persona cepillándose los dientes."))
+        assertEquals(true, VerdictParser.parse("Sí. Está en el gimnasio."))
+        assertEquals(false, VerdictParser.parse("NO, es solo un zapato seco."))
+        assertEquals(false, VerdictParser.parse("No se ve ninguna persona."))
+        assertEquals(true, VerdictParser.parse("Yes, the person is brushing."))
+        assertEquals(true, VerdictParser.parse("  SÍ - no hay duda"))            // gana la primera palabra
+        assertNull(VerdictParser.parse("Talvez, la foto está borrosa."))
+        assertNull(VerdictParser.parse(""))
     }
 
     private fun quiet() = List(6) { Epoch(0, false, false) }

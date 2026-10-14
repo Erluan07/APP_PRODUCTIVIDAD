@@ -169,6 +169,8 @@ class AlarmActivity : ComponentActivity() {
         val flex = remember { mutableStateListOf<String>() }
         val musts = remember { mutableStateListOf<MustTask>() }
         var mustMode by remember { mutableStateOf(false) }
+        val modelReady = remember { com.kronos.focus.vision.VisionModel.isReady(this@AlarmActivity) }
+        var verifyAi by remember { mutableStateOf(modelReady) }
         val templates = remember { TemplateStore.get(this@AlarmActivity).all() }
         val external = remember { TaskManagerClient.pending(this@AlarmActivity) }
         var name by remember { mutableStateOf("") }
@@ -265,7 +267,7 @@ class AlarmActivity : ComponentActivity() {
                                 Text(t.name, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                                 MutedText(if (t.isMust) "Obligatoria desde ${t.hm(t.startMin!!)}" else if (t.isTimed) "${t.hm(t.startMin!!)} – ${t.hm(t.endMin!!)}" else "Sin hora")
                             }
-                            TextAction("Usar", { name = t.name; start = t.startMin; end = t.endMin; mustMode = t.isMust; error = null })
+                            TextAction("Usar", { name = t.name; start = t.startMin; end = t.endMin; mustMode = t.isMust; verifyAi = t.verify && modelReady; error = null })
                         }
                     }
                 }
@@ -284,6 +286,10 @@ class AlarmActivity : ComponentActivity() {
                 if (mustMode) {
                     TimeField("Hora de inicio", start, { start = it }, Modifier.fillMaxWidth())
                     MutedText("Sin hora de fin: desde esa hora el teléfono se bloquea hasta que la hagas y subas una foto de evidencia. No se puede quitar después de confirmar.")
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(if (modelReady) "Verificar la foto con IA" else "Verificar con IA (carga el modelo en Más → Sistema)", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                        Switch(checked = verifyAi && modelReady, onCheckedChange = { verifyAi = it }, enabled = modelReady)
+                    }
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         TimeField("Inicio", start, { start = it }, Modifier.weight(1f))
@@ -299,7 +305,7 @@ class AlarmActivity : ComponentActivity() {
                         mustMode -> when {
                             s == null -> error = "Elige la hora de inicio."
                             musts.any { it.name.equals(name.trim(), true) } -> error = "Ya la agregaste."
-                            else -> { musts.add(MustTask(name.trim(), AgendaValidator.todayAt(s))); name = ""; start = null; end = null; error = null }
+                            else -> { musts.add(MustTask(name.trim(), AgendaValidator.todayAt(s), verify = verifyAi && modelReady)); name = ""; start = null; end = null; error = null }
                         }
                         s == null && e == null -> {
                             if (name.trim() !in flex) flex.add(name.trim())

@@ -31,6 +31,9 @@ class MainActivity : ComponentActivity() {
     }
     private val camLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
     private val calLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    private val modelLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { com.kronos.focus.vision.VisionModel.importFrom(this, it) }
+    }
     private val actLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
     private val notifLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { requestSteps() }
 
@@ -79,6 +82,7 @@ class MainActivity : ComponentActivity() {
             requestCamera = { camLauncher.launch(Manifest.permission.CAMERA) },
             requestCalendar = { calLauncher.launch(Manifest.permission.READ_CALENDAR) },
             requestSteps = { actLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION) },
+            importModel = { modelLauncher.launch(arrayOf("*/*")) },
         )
         setContent { KronosTheme { AppRoot(actions) } }
     }

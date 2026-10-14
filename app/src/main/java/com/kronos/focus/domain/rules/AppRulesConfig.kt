@@ -82,6 +82,12 @@ object AppRulesConfig {
     const val USAGE_MIN_LIMIT_MIN = 5
     const val USAGE_MAX_LIMIT_MIN = 480
 
+    // ---- Verificación de la evidencia con IA local (tareas obligatorias) ----
+    /** Intentos con la foto antes de esperar. */
+    const val VERIFY_MAX_ATTEMPTS = 3
+    /** Espera tras agotar los intentos (el teléfono sigue bloqueado). */
+    const val VERIFY_LOCK_MIN = 10L
+
     // ---- Alarmas: las configuras en la app (pestaña Dormir). Esto solo fija las reglas de edición. ----
     /** Una alarma activa que suena en menos de estas horas no se puede cambiar, apagar ni borrar. */
     const val ALARM_LOCK_HOURS = 3L
