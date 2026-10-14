@@ -10,32 +10,26 @@ object AppRulesConfig {
 
     const val APP_PACKAGE = "com.kronos.focus"
 
-    /** Apps de usuario permitidas dentro del Modo Búnker. */
-    val WHITELIST: Set<String> = setOf(
+    /** Siempre permitido en el búnker, pase lo que pase: la propia app y el Teléfono (llamadas de emergencia). */
+    val CORE_ALLOWED: Set<String> = setOf(
         APP_PACKAGE,
-        // 1. Teléfono (varía por fabricante; incluye pantalla de llamada en curso)
-        "com.google.android.dialer",
-        "com.android.dialer",
-        "com.samsung.android.dialer",
-        "com.samsung.android.incallui",
-        "com.android.incallui",
-        "com.android.server.telecom",
-        "com.android.phone",
-        // 2. WhatsApp
-        "com.whatsapp",
-        "com.whatsapp.w4b",
-        // 3. Spotify
-        "com.spotify.music",
-        // 3b. Task Manager IA (tu app de tareas)
-        "com.erluan.taskmanageria",
-        // 4. Emergencias: mensajes y contactos (SMS/llamar a un contacto)
-        "com.google.android.apps.messaging",
-        "com.samsung.android.messaging",
-        "com.android.mms",
-        "com.google.android.contacts",
-        "com.samsung.android.app.contacts",
-        "com.android.contacts",
+        "com.google.android.dialer", "com.android.dialer", "com.samsung.android.dialer",
+        "com.samsung.android.incallui", "com.android.incallui", "com.android.server.telecom", "com.android.phone",
     )
+
+    /**
+     * Apps sugeridas (preseleccionadas) la primera vez que abres Kronos. Ahí eliges cuáles quedan habilitadas
+     * en el búnker; al confirmar la elección se bloquea y ya no se puede cambiar (ver AllowedAppsStore).
+     */
+    val DEFAULT_USER_APPS: Set<String> = setOf(
+        "com.whatsapp", "com.whatsapp.w4b", "com.spotify.music",
+        "com.erluan.taskmanageria", // Task Manager IA
+        "com.google.android.apps.messaging", "com.samsung.android.messaging", "com.android.mms",
+        "com.google.android.contacts", "com.samsung.android.app.contacts", "com.android.contacts",
+    )
+
+    /** Apps habilitadas por defecto (hasta que se elige la lista). */
+    val WHITELIST: Set<String> = CORE_ALLOWED + DEFAULT_USER_APPS
 
     /** Prefijos permitidos (variantes de la misma app: WhatsApp Business, procesos auxiliares). */
     val ALLOWED_PREFIXES: List<String> = listOf("com.whatsapp", "com.spotify", "com.bancolombia", "com.todo1.mobile")  // Bancolombia (transferencias)
@@ -107,7 +101,7 @@ object AppRulesConfig {
 
     // ---- Anti-recaída tras despertar ----
     /** Minutos que se vigila después de confirmar "estoy despierto". */
-    const val AWAKE_WATCH_MIN = 60L
+    const val AWAKE_WATCH_MIN = 30L
     /** Minutos sin usar ni mover el teléfono para considerar que te volviste a dormir y volver a sonar. */
     const val AWAKE_IDLE_MIN = 10L
     const val AWAKE_MOVE_DELTA = 0.6f
@@ -138,11 +132,11 @@ object AppRulesConfig {
     const val BOOT_TRAP_PENALTY_MIN = 60L
 
     /**
-     * Pantallas del sistema que WhatsApp abre al adjuntar/compartir/hacer foto/elegir contacto o
-     * abrir un enlace del chat. Solo se permiten mientras vienes de WhatsApp (ver servicio de bloqueo);
-     * abiertas por su cuenta (desde el launcher) siguen bloqueadas.
+     * Pantallas del sistema que una app permitida abre al adjuntar/compartir/hacer foto/elegir contacto.
+     * Solo se permiten mientras vienes de una app permitida (ver servicio de bloqueo); abiertas por su
+     * cuenta (desde el launcher) siguen bloqueadas. Navegadores y tiendas NO están aquí.
      */
-    val WHATSAPP_HELPERS: Set<String> = setOf(
+    val APP_HELPERS: Set<String> = setOf(
         "android", // selector/chooser/diálogos del sistema
         "com.google.android.gms", "com.google.android.documentsui", "com.android.documentsui",
         "com.android.providers.media", "com.android.providers.media.module",
@@ -153,15 +147,19 @@ object AppRulesConfig {
         "com.google.android.contacts", "com.samsung.android.dialer",
         "com.samsung.android.app.smartcapture", "com.sec.android.app.myfiles", "com.samsung.android.provider.filterprovider",
         "com.samsung.android.mdx", "com.samsung.android.scs", "com.samsung.android.bixby.service",
-        "com.android.vending", "com.android.chrome", "com.sec.android.app.sbrowser",
         "com.android.intentresolver",
     )
 
     /** Nombres de paquete que jamás deben bloquearse (llamadas de emergencia). */
-    fun isAllowed(pkg: String, launchers: Set<String>, imes: Set<String>, strict: Boolean = false): Boolean =
-        pkg !in ALWAYS_BLOCKED_IN_BUNKER &&
-            BLOCKED_PREFIXES.none { pkg.startsWith(it) } && !pkg.contains(".settings") &&
-            (pkg in (if (strict) SLEEP_WHITELIST else WHITELIST) ||
-                (if (strict) STRICT_PREFIXES else ALLOWED_PREFIXES).any { pkg.startsWith(it) } ||
-                pkg in SYSTEM_ALLOWED || pkg in launchers || pkg in imes)
+    /** ¿Es una app de usuario habilitada? [userApps] = la lista elegida y bloqueada; null = aún sin elegir (valores por defecto). */
+    fun isUserApp(pkg: String, userApps: Set<String>?): Boolean =
+        if (userApps != null) pkg in userApps || userApps.any { pkg.startsWith("$it.") }
+        else pkg in DEFAULT_USER_APPS || ALLOWED_PREFIXES.any { pkg.startsWith(it) }
+
+    fun isAllowed(pkg: String, launchers: Set<String>, imes: Set<String>, strict: Boolean = false, userApps: Set<String>? = null): Boolean {
+        if (pkg in ALWAYS_BLOCKED_IN_BUNKER || BLOCKED_PREFIXES.any { pkg.startsWith(it) } || pkg.contains(".settings")) return false
+        val app = if (strict) pkg in SLEEP_WHITELIST || STRICT_PREFIXES.any { pkg.startsWith(it) }
+        else pkg in CORE_ALLOWED || isUserApp(pkg, userApps)
+        return app || pkg in SYSTEM_ALLOWED || pkg in launchers || pkg in imes
+    }
 }

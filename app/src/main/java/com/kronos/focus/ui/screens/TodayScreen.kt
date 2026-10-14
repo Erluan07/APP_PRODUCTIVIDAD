@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Warning
@@ -49,6 +50,7 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
     val agenda = AgendaStore.get(ctx)
     val proofs = ProofStore.get(ctx)
     val refresh = LocalRefresh.current
+    val midnight = com.kronos.focus.ui.theme.UiDesign.current == com.kronos.focus.ui.theme.UiDesign.MIDNIGHT
     var showAdd by remember { mutableStateOf(false) }
     var showStart by remember { mutableStateOf(false) }
     var picking by remember { mutableStateOf<String?>(null) }
@@ -67,7 +69,12 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
             StatusPill(if (active) (if (sleeping) "Dormir" else "Búnker") else "Libre", if (active) Tone.INFO else Tone.OK)
         }
 
-        if (active) {
+        if (midnight) {
+            MidnightHero(store, now, active, sleeping, remainingSec, a11y,
+                onBunker = { showStart = true },
+                onSleep = { actions.startSleep(); refresh() },
+                onExit = { store.debugClear(); refresh() })
+        } else if (active) {
             HeroCard {
                 Text(if (sleeping) "Modo Dormir" else "Modo Búnker", style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.9f))
                 Text(fmtCountdown(remainingSec), style = MaterialTheme.typography.displayMedium, color = Color.White)
@@ -288,4 +295,41 @@ private fun BunkerStartDialog(onDismiss: () -> Unit, onStart: (Long, Boolean) ->
         confirmButton = { TextAction("Iniciar", { value?.let { onStart(it, pomodoro) } }, enabled = valid) },
         dismissButton = { TextAction("Cancelar", onDismiss) },
     )
+}
+
+/** Diseño Medianoche: anillo de enfoque grande + dos botones cuadrados, en lugar de una tarjeta ancha. */
+@Composable
+private fun MidnightHero(
+    store: BunkerStateStore, now: Long, active: Boolean, sleeping: Boolean, remainingSec: Long, a11y: Boolean,
+    onBunker: () -> Unit, onSleep: () -> Unit, onExit: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        val pomo = if (active && !sleeping) store.pomodoroPhase(now) else null
+        FocusRing(progress = if (active) store.progress(now) else 0f) {
+            if (active) {
+                Text(
+                    if (sleeping) "MODO DORMIR" else if (pomo != null) (if (pomo.focus) "ENFOQUE" else "DESCANSO") else "BÚNKER",
+                    style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary,
+                )
+                Text(fmtCountdown(if (pomo != null) pomo.remainingSec else remainingSec), style = MaterialTheme.typography.displayMedium, color = MaterialTheme.colorScheme.onSurface)
+                MutedText(if (pomo != null) "Total ${fmtCountdown(remainingSec)}" else if (sleeping) "hasta tu alarma" else "restante")
+            } else {
+                Text("LIBRE", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Text("Listo", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.onSurface)
+                MutedText("para enfocar")
+            }
+        }
+        if (active) {
+            MutedText(
+                if (sleeping) "Solo Teléfono y Spotify hasta tu alarma."
+                else "Solo tus apps habilitadas, Teléfono y lo esencial del sistema.",
+            )
+            if (BuildConfig.TEST_BUILD) TextAction("Salir del búnker (solo versión de prueba)", onExit)
+        } else {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ActionTile("Modo Búnker", "Elige el tiempo", Icons.Filled.Lock, onBunker, Modifier.weight(1f), enabled = a11y)
+                ActionTile("Me voy a dormir", "Hasta tu alarma", Icons.Filled.Notifications, onSleep, Modifier.weight(1f), enabled = a11y)
+            }
+        }
+    }
 }

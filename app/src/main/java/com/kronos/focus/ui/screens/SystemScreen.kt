@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -87,6 +88,27 @@ fun SystemSection(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
                 StatusPill("${store.tamperCount()} desactivaciones", if (store.tamperCount() == 0) Tone.OK else Tone.WARN)
             }
             MutedText("Las reglas y la lista blanca están en el código; no hay ajustes en la app para relajarlas.")
+        }
+
+        AppCard {
+            SectionTitle("Apariencia", "Solo estética: cámbiala cuando quieras para comparar.")
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val cur = com.kronos.focus.ui.theme.UiDesign.current
+                (if (cur == com.kronos.focus.ui.theme.UiDesign.MIDNIGHT) CtaButton("Medianoche ✓", {}, Modifier.weight(1f))
+                else SoftButton("Medianoche", { com.kronos.focus.ui.theme.UiDesign.set(ctx, com.kronos.focus.ui.theme.UiDesign.MIDNIGHT) }, Modifier.weight(1f)))
+                (if (cur == com.kronos.focus.ui.theme.UiDesign.CLASSIC) CtaButton("Clásico ✓", {}, Modifier.weight(1f))
+                else SoftButton("Clásico", { com.kronos.focus.ui.theme.UiDesign.set(ctx, com.kronos.focus.ui.theme.UiDesign.CLASSIC) }, Modifier.weight(1f)))
+            }
+        }
+
+        AppCard {
+            val chosen = com.kronos.focus.data.AllowedAppsStore.get(ctx).chosen().orEmpty()
+            SectionTitle("Apps habilitadas en el búnker", "Elegidas la primera vez; ya no se pueden cambiar. El Teléfono siempre está permitido.")
+            val pm = ctx.packageManager
+            val names = remember(chosen) {
+                chosen.map { p -> runCatching { pm.getApplicationLabel(pm.getApplicationInfo(p, 0)).toString() }.getOrDefault(p) }.sorted()
+            }
+            MutedText(if (names.isEmpty()) "Ninguna (solo el Teléfono)." else names.joinToString(" · "))
         }
 
         AppCard {

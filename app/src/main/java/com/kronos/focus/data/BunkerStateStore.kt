@@ -22,6 +22,7 @@ class BunkerStateStore private constructor(
 
     @Volatile private var endsAtMs: Long = prefs.getLong(KEY_ENDS_AT, 0L)
 
+    @Volatile private var sessionStartMs: Long = prefs.getLong(KEY_SESSION_START, 0L)
     @Volatile private var pomoStartMs: Long = prefs.getLong(KEY_POMO_START, 0L)
     @Volatile private var sleepStartMs: Long = prefs.getLong(KEY_SLEEP_START, 0L)
     @Volatile private var sleepEndMs: Long = prefs.getLong(KEY_SLEEP_END, 0L)
@@ -61,9 +62,23 @@ class BunkerStateStore private constructor(
      */
     fun startSession(minutes: Long, pomodoro: Boolean = false) {
         val now = System.currentTimeMillis()
-        if (now >= endsAtMs) setPomodoro(if (pomodoro) now else 0L)
+        if (now >= endsAtMs) {
+            setPomodoro(if (pomodoro) now else 0L)
+            sessionStartMs = now
+            prefs.edit().putLong(KEY_SESSION_START, now).apply()
+        }
         val m = minutes.coerceAtMost(AppRulesConfig.MAX_SINGLE_BUNKER_MIN)
         extendUntil(now + m * 60_000L)
+    }
+
+    /** Fracción restante (1 → 0) de la sesión activa, para el anillo de la pantalla Hoy. */
+    fun progress(now: Long = System.currentTimeMillis()): Float {
+        val spans = ArrayList<Pair<Long, Long>>(3)
+        if (now < endsAtMs) spans += sessionStartMs to endsAtMs
+        agenda.activeBlockAt(now)?.let { spans += it.startMs to it.endMs }
+        if (isSleepMode(now)) spans += sleepStartMs to sleepEndMs
+        val (s, e) = spans.maxByOrNull { it.second } ?: return 0f
+        return if (e <= s) 1f else ((e - now).toFloat() / (e - s)).coerceIn(0f, 1f)
     }
 
     private fun setPomodoro(startMs: Long) {
@@ -114,13 +129,12 @@ class BunkerStateStore private constructor(
         if (isActive()) applyPenalty(minutes) else startSession(minutes)
     }
 
-    /** SOLO builds debug: salida de emergencia durante las pruebas. */
+    /** SOLO builds de prueba: salida de emergencia. NO toca la agenda (antes la borraba y se perdían las tareas del día). */
     fun debugClear() {
         endsAtMs = 0L
         prefs.edit().putLong(KEY_ENDS_AT, 0L).apply()
         setPomodoro(0L)
         endSleep()
-        agenda.clear()
     }
 
     // ---- Diagnóstico / registro de intentos ----
@@ -143,6 +157,7 @@ class BunkerStateStore private constructor(
     fun recordTamper() { prefs.edit().putInt(KEY_TAMPER, tamperCount() + 1).apply() }
 
     companion object {
+        private const val KEY_SESSION_START = "session_start"
         private const val KEY_POMO_START = "pomo_start"
         private const val KEY_POMO_LAST = "pomo_last"
         private const val KEY_ENDS_AT = "bunker_ends_at"

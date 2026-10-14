@@ -18,7 +18,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.kronos.focus.admin.DeviceOwnerHardening
+import com.kronos.focus.data.AllowedAppsStore
 import com.kronos.focus.data.BunkerStateStore
+import com.kronos.focus.ui.components.FloatingDock
+import com.kronos.focus.ui.theme.UiDesign
 import com.kronos.focus.services.AccessibilityGuard
 import com.kronos.focus.ui.screens.*
 import kotlinx.coroutines.Dispatchers
@@ -64,6 +67,12 @@ fun AppRoot(actions: AppActions) {
             }
         }
     }
+    var appsChosen by remember { mutableStateOf(AllowedAppsStore.get(ctx).isLocked()) }
+    if (!appsChosen) {
+        AppPickerScreen(ctx, onDone = { appsChosen = true })
+        return
+    }
+    val midnight = UiDesign.current == UiDesign.MIDNIGHT
     val tabs = listOf(
         Tab("Hoy", Icons.Filled.Home), Tab("Alarmas", Icons.Filled.Notifications),
         Tab("Tareas", Icons.Filled.CheckCircle), Tab("Más", Icons.Filled.Settings),
@@ -71,7 +80,9 @@ fun AppRoot(actions: AppActions) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+            if (midnight) {
+                FloatingDock(tabs.map { it.label }, tabs.map { it.icon }, tab) { tab = it; now = System.currentTimeMillis() }
+            } else NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                 tabs.forEachIndexed { i, t ->
                     NavigationBarItem(
                         selected = tab == i, onClick = { tab = i; now = System.currentTimeMillis() },

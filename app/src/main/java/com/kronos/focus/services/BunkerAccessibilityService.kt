@@ -29,12 +29,14 @@ class BunkerAccessibilityService : AccessibilityService() {
     @Volatile private var launchers: Set<String> = emptySet()
     @Volatile private var imes: Set<String> = emptySet()
     private var lastPackage: String? = null
-    /** true mientras la última app "real" fue WhatsApp: permite sus pantallas auxiliares (adjuntar, cámara, enlaces). */
-    private var fromWhatsApp = false
+    /** true mientras la última app "real" fue una app habilitada: permite sus pantallas auxiliares (adjuntar, cámara). */
+    private var fromAllowedApp = false
+    private lateinit var allowedApps: com.kronos.focus.data.AllowedAppsStore
 
     override fun onServiceConnected() {
         state = BunkerStateStore.get(this)
         alarm = com.kronos.focus.data.AlarmStateStore.get(this)
+        allowedApps = com.kronos.focus.data.AllowedAppsStore.get(this)
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         refreshInfrastructurePackages()
     }
@@ -57,16 +59,18 @@ class BunkerAccessibilityService : AccessibilityService() {
         if (!state.isActive()) { hideOverlay(); lastPackage = pkg; return }
 
         val strict = state.isSleepMode()
-        if (!strict && pkg.startsWith("com.whatsapp")) fromWhatsApp = true
-        val helper = !strict && fromWhatsApp && pkg in AppRulesConfig.WHATSAPP_HELPERS
-        if (helper || AppRulesConfig.isAllowed(pkg, launchers, imes, strict = strict)) {
-            if (!helper && !pkg.startsWith("com.whatsapp") && pkg !in AppRulesConfig.SYSTEM_ALLOWED && pkg !in imes) fromWhatsApp = false
+        val userApps = allowedApps.chosen()
+        val isUserApp = !strict && AppRulesConfig.isUserApp(pkg, userApps)
+        if (isUserApp) fromAllowedApp = true
+        val helper = !strict && fromAllowedApp && pkg in AppRulesConfig.APP_HELPERS
+        if (helper || AppRulesConfig.isAllowed(pkg, launchers, imes, strict = strict, userApps = userApps)) {
+            if (!helper && !isUserApp && pkg !in AppRulesConfig.SYSTEM_ALLOWED && pkg !in imes) fromAllowedApp = false
             if (pkg != lastPackage) state.recordSeen(pkg, true)
             hideOverlay()
         } else {
             // Los bloqueados se re-bloquean siempre (sin deduplicar) por si el HOME falló.
             state.recordSeen(pkg, false)
-            fromWhatsApp = false
+            fromAllowedApp = false
             block(pkg)
         }
         lastPackage = pkg

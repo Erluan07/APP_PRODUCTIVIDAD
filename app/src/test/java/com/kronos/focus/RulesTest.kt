@@ -116,6 +116,26 @@ class RulesTest {
         assertTrue(AppRulesConfig.isAllowed("com.google.android.apps.messaging", launchers, imes, strict = false))
     }
 
+    @Test fun chosenAppsReplaceDefaultsButPhoneStaysAllowed() {
+        val chosen = setOf("com.example.notes", "com.whatsapp")
+        fun ok(p: String) = AppRulesConfig.isAllowed(p, launchers, imes, userApps = chosen)
+        assertTrue(ok("com.example.notes"))
+        assertTrue(ok("com.whatsapp"))
+        assertTrue(ok("com.whatsapp.w4b"))                 // misma familia que una app elegida
+        assertFalse(ok("com.spotify.music"))               // no elegida: bloqueada aunque estuviera en los valores por defecto
+        assertTrue(ok("com.google.android.dialer"))        // el Teléfono siempre
+        assertTrue(ok("com.android.systemui"))
+        assertFalse(ok("com.android.settings"))
+        assertFalse(ok("com.instagram.android"))
+        assertFalse(AppRulesConfig.isAllowed("com.example.notes", launchers, imes, strict = true, userApps = chosen))
+    }
+
+    @Test fun helperScreensExcludeBrowsersAndStores() {
+        assertTrue("com.sec.android.app.camera" in AppRulesConfig.APP_HELPERS)
+        assertFalse("com.android.chrome" in AppRulesConfig.APP_HELPERS)
+        assertFalse("com.android.vending" in AppRulesConfig.APP_HELPERS)
+    }
+
     private fun quiet() = List(6) { Epoch(0, false, false) }
     private fun stirring() = List(6) { Epoch(2, false, false) }
 

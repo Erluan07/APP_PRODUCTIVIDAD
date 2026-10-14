@@ -1,7 +1,13 @@
 package com.kronos.focus.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -148,5 +154,67 @@ fun IconText(icon: ImageVector, text: String, modifier: Modifier = Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
         Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+/** Anillo de progreso (diseño Medianoche): la parte iluminada es el tiempo que queda. */
+@Composable
+fun FocusRing(progress: Float, modifier: Modifier = Modifier, size: Dp = 232.dp, content: @Composable ColumnScope.() -> Unit) {
+    val track = MaterialTheme.colorScheme.outlineVariant
+    val arc = MaterialTheme.colorScheme.primary
+    Box(modifier.size(size), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val stroke = 14.dp.toPx()
+            val topLeft = Offset(stroke / 2, stroke / 2)
+            val arcSize = Size(this.size.width - stroke, this.size.height - stroke)
+            drawArc(track, 0f, 360f, false, topLeft, arcSize, style = Stroke(stroke))
+            if (progress > 0f) drawArc(arc, -90f, 360f * progress.coerceIn(0f, 1f), false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp), content = content)
+    }
+}
+
+/** Botón cuadrado grande con icono (acciones principales de Hoy en el diseño Medianoche). */
+@Composable
+fun ActionTile(title: String, subtitle: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    val k = Kronos.colors
+    Surface(
+        onClick = onClick, enabled = enabled, modifier = modifier.heightIn(min = 132.dp), shape = MaterialTheme.shapes.large,
+        color = if (enabled) k.cta else MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = if (enabled) k.onCta else MaterialTheme.colorScheme.onSurfaceVariant,
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.SpaceBetween) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(30.dp))
+            Spacer(Modifier.height(14.dp))
+            Column {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+/** Barra inferior flotante en forma de píldora (diseño Medianoche): la pestaña activa se expande con su nombre. */
+@Composable
+fun FloatingDock(labels: List<String>, icons: List<ImageVector>, selected: Int, onSelect: (Int) -> Unit) {
+    Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 24.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
+        Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surfaceVariant, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
+            Row(Modifier.padding(6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                labels.forEachIndexed { i, label ->
+                    val on = i == selected
+                    Surface(
+                        onClick = { onSelect(i) }, shape = RoundedCornerShape(50),
+                        color = if (on) MaterialTheme.colorScheme.primary else Color.Transparent,
+                        contentColor = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) {
+                        Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(icons[i], contentDescription = label, modifier = Modifier.size(22.dp))
+                            if (on) Text(label, style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                }
+            }
+        }
     }
 }

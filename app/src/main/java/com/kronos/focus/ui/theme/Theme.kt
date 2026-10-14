@@ -1,6 +1,10 @@
 package com.kronos.focus.ui.theme
 
+import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -44,6 +48,32 @@ private val LightKronos = KronosColors(
 private val DarkKronos = KronosColors(
     Palette.Orange400, Palette.Slate900, Color(0xFF14532D), Color(0xFF86EFAC), Color(0xFF78350F), Color(0xFFFCD34D), Palette.Teal900, Palette.Teal800,
 )
+// Diseño "Medianoche": casi negro, acento lima, violeta de apoyo, esquinas muy redondeadas.
+private object Mid {
+    val Bg = Color(0xFF0B0D12); val Surface = Color(0xFF151922); val SurfaceHi = Color(0xFF1E2430)
+    val Outline = Color(0xFF2A3140); val Text = Color(0xFFF2F5FA); val Muted = Color(0xFF9AA4B5)
+    val Lime = Color(0xFFC8F751); val OnLime = Color(0xFF10140A); val LimeDeep = Color(0xFF26301A); val LimeSoft = Color(0xFFE4FFA3)
+    val Violet = Color(0xFFA78BFA)
+}
+private val MidnightKronos = KronosColors(
+    Mid.Lime, Mid.OnLime, Color(0xFF1B3322), Color(0xFF9BF0B0), Color(0xFF3A2E10), Color(0xFFFCD34D), Color(0xFF1B2230), Color(0xFF121722),
+)
+private val MidnightScheme = darkColorScheme(
+    primary = Mid.Lime, onPrimary = Mid.OnLime,
+    primaryContainer = Mid.LimeDeep, onPrimaryContainer = Mid.LimeSoft,
+    secondary = Mid.Violet, onSecondary = Mid.OnLime,
+    tertiary = Mid.Violet, onTertiary = Mid.OnLime,
+    background = Mid.Bg, onBackground = Mid.Text,
+    surface = Mid.Surface, onSurface = Mid.Text,
+    surfaceVariant = Mid.SurfaceHi, onSurfaceVariant = Mid.Muted,
+    outline = Mid.Outline, outlineVariant = Mid.Outline,
+    error = Palette.Red400, onError = Palette.Slate900, errorContainer = Color(0xFF4A1D1D), onErrorContainer = Palette.Red100,
+)
+private val MidnightShapes = Shapes(
+    extraSmall = RoundedCornerShape(10.dp), small = RoundedCornerShape(14.dp), medium = RoundedCornerShape(20.dp),
+    large = RoundedCornerShape(28.dp), extraLarge = RoundedCornerShape(36.dp),
+)
+
 val LocalKronosColors = staticCompositionLocalOf { LightKronos }
 
 object Kronos {
@@ -104,12 +134,23 @@ private val KronosShapes = Shapes(
 
 @Composable
 fun KronosTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
-    CompositionLocalProvider(LocalKronosColors provides if (dark) DarkKronos else LightKronos) {
+    val midnight = UiDesign.current == UiDesign.MIDNIGHT
+    val dark = midnight || isSystemInDarkTheme()
+    // Con el diseño oscuro forzado, los iconos de las barras del sistema deben ser claros aunque el teléfono esté en modo claro.
+    val activity = LocalContext.current as? ComponentActivity
+    SideEffect {
+        runCatching {
+            if (midnight) activity?.enableEdgeToEdge(
+                statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+                navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            ) else activity?.enableEdgeToEdge()
+        }
+    }
+    CompositionLocalProvider(LocalKronosColors provides if (midnight) MidnightKronos else if (dark) DarkKronos else LightKronos) {
         MaterialTheme(
-            colorScheme = if (dark) DarkScheme else LightScheme,
+            colorScheme = if (midnight) MidnightScheme else if (dark) DarkScheme else LightScheme,
             typography = Typography().withFont(Jakarta),
-            shapes = KronosShapes,
+            shapes = if (midnight) MidnightShapes else KronosShapes,
             content = content,
         )
     }
