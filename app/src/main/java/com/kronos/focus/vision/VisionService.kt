@@ -82,7 +82,7 @@ class VisionService : Service() {
         val conv = eng.createConversation(ConversationConfig(samplerConfig = SamplerConfig(topK = 10, topP = 0.95, temperature = 0.2)))
         try {
             val reply = conv.sendMessage(Contents.of(Content.ImageFile(img), Content.Text(VerdictParser.prompt(task))))
-            val text = reply.text.toString().trim()
+            val text = reply.toString().trim() // Message.toString() = texto de la respuesta (no existe .text en esta versión)
             val verdict = VerdictParser.parse(text)
             return Result(if (verdict == true) 1 else 0, if (text.isBlank()) "Sin respuesta del modelo" else text.take(300))
         } finally {
