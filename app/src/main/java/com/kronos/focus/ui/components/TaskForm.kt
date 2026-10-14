@@ -41,7 +41,10 @@ fun TaskForm(button: String, onSubmit: (String, Int?, Int?) -> String?, onSucces
 
 /** Tarea obligatoria: solo nombre + hora de INICIO. Desde esa hora el teléfono se bloquea hasta subir la evidencia. */
 @Composable
-fun MustTaskForm(onSubmit: (String, Int) -> String?, onSuccess: () -> Unit = {}) {
+fun MustTaskForm(
+    onSubmit: (String, Int) -> String?, onSuccess: () -> Unit = {},
+    button: String = "Agregar tarea obligatoria", confirmFirst: Boolean = true,
+) {
     var name by remember { mutableStateOf("") }
     var start by remember { mutableStateOf<Int?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -53,13 +56,20 @@ fun MustTaskForm(onSubmit: (String, Int) -> String?, onSuccess: () -> Unit = {})
         )
         TimeField("Hora de inicio", start, { start = it }, Modifier.fillMaxWidth())
         MutedText("Sin hora de fin. A partir de la hora de inicio el teléfono se bloquea hasta que la hagas y subas una foto de evidencia. No se puede cancelar.")
-        CtaButton("Agregar tarea obligatoria", onClick = {
+        CtaButton(button, onClick = {
             error = when {
                 name.isBlank() -> "Escribe el nombre."
                 start == null -> "Elige la hora de inicio."
                 else -> null
             }
-            if (error == null) confirm = true
+            if (error == null) {
+                if (confirmFirst) confirm = true
+                else {
+                    val err = onSubmit(name.trim(), start!!)
+                    error = err
+                    if (err == null) { name = ""; start = null; onSuccess() }
+                }
+            }
         })
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
     }

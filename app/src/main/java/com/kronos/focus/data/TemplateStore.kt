@@ -19,7 +19,7 @@ class TemplateStore private constructor(private val prefs: SharedPreferences) {
 
     private fun save(list: List<TaskTemplate>) {
         val arr = JSONArray()
-        list.forEach { arr.put(JSONObject().put("n", it.name).put("s", it.startMin ?: -1).put("e", it.endMin ?: -1)) }
+        list.forEach { arr.put(JSONObject().put("n", it.name).put("s", it.startMin ?: -1).put("e", it.endMin ?: -1).put("m", it.must)) }
         prefs.edit().putString(KEY, arr.toString()).apply()
     }
 

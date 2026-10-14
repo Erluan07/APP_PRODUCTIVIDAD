@@ -29,8 +29,11 @@ fun TasksScreen(ctx: Context, now: Long, actions: AppActions) {
     val list = remember(tick, now / 2000) { templates.all() }
     val tm = remember(tick) { TaskManagerClient.pending(ctx) }
 
+    var confirmMust by remember { mutableStateOf<TaskTemplate?>(null) }
+
     fun addToday(t: TaskTemplate): String? =
-        if (t.isTimed) AgendaActions.addBlock(ctx, AgendaBlock(t.name, AgendaValidator.todayAt(t.startMin!!), AgendaValidator.todayAt(t.endMin!!)))
+        if (t.isMust) { confirmMust = t; null }
+        else if (t.isTimed) AgendaActions.addBlock(ctx, AgendaBlock(t.name, AgendaValidator.todayAt(t.startMin!!), AgendaValidator.todayAt(t.endMin!!)))
         else AgendaActions.addFlex(ctx, t.name)
 
     ScreenScaffold(fab = { AddFab("Tarea", Icons.Filled.Add) { showNew = true } }) {
@@ -43,7 +46,7 @@ fun TasksScreen(ctx: Context, now: Long, actions: AppActions) {
                 Row(Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(t.name, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-                        MutedText(if (t.isTimed) "${t.hm(t.startMin!!)} – ${t.hm(t.endMin!!)}" else "Sin hora")
+                        MutedText(if (t.isMust) "Obligatoria · bloquea desde ${t.hm(t.startMin!!)}" else if (t.isTimed) "${t.hm(t.startMin!!)} – ${t.hm(t.endMin!!)}" else "Sin hora")
                     }
                     TextAction("Hoy", { msg = addToday(t) })
                     IconButton(onClick = { templates.remove(t.name); tick++ }) {
@@ -85,9 +88,31 @@ fun TasksScreen(ctx: Context, now: Long, actions: AppActions) {
         ModalBottomSheet(onDismissRequest = { showNew = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
             Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp).navigationBarsPadding().imePadding(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Nueva tarea", style = MaterialTheme.typography.titleLarge)
-                MutedText("Con hora fija (ej. Gimnasio 18:00–19:30) o sin hora.")
-                TaskForm("Guardar en Mis tareas", onSubmit = { n, s, e -> templates.upsert(TaskTemplate(n, s, e)); tick++; null }, onSuccess = { showNew = false })
+                var mustMode by remember { mutableStateOf(false) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = !mustMode, onClick = { mustMode = false }, label = { Text("Normal") })
+                    FilterChip(selected = mustMode, onClick = { mustMode = true }, label = { Text("Obligatoria") })
+                }
+                if (mustMode) {
+                    MutedText("Se guarda como plantilla; al sumarla a hoy bloquea el teléfono desde su hora hasta subir la evidencia.")
+                    MustTaskForm(onSubmit = { n, s -> templates.upsert(TaskTemplate(n, s, null, must = true)); tick++; null }, onSuccess = { showNew = false }, button = "Guardar en Mis tareas", confirmFirst = false)
+                } else {
+                    MutedText("Con hora fija (ej. Gimnasio 18:00–19:30) o sin hora.")
+                    TaskForm("Guardar en Mis tareas", onSubmit = { n, s, e -> templates.upsert(TaskTemplate(n, s, e)); tick++; null }, onSuccess = { showNew = false })
+                }
             }
         }
+    }
+
+    confirmMust?.let { t ->
+        AlertDialog(
+            onDismissRequest = { confirmMust = null },
+            title = { Text("¿Sumar “${t.name}” a hoy?") },
+            text = { Text("Bloqueará el teléfono desde las ${t.hm(t.startMin!!)} (si ya pasó, desde ahora) hasta que subas la foto de evidencia. No se puede cancelar.") },
+            confirmButton = {
+                TextAction("Confirmar", { msg = AgendaActions.addMust(ctx, t.name, AgendaValidator.todayAt(t.startMin)); confirmMust = null })
+            },
+            dismissButton = { TextAction("Cancelar", { confirmMust = null }) },
+        )
     }
 }

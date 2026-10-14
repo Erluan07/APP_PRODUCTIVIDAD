@@ -10,6 +10,8 @@ import com.kronos.focus.data.StatsStore
 import com.kronos.focus.data.BunkerStateStore
 import com.kronos.focus.domain.agenda.AgendaBlock
 import com.kronos.focus.domain.agenda.AgendaValidator
+import com.kronos.focus.domain.agenda.MustRules
+import com.kronos.focus.domain.agenda.MustTask
 import kotlin.random.Random
 
 /** Máquina de estados de la alarma. Toda transición pasa por aquí. */
@@ -73,12 +75,15 @@ object AlarmFlow {
     }
 
     /** Misión 2: valida y fija la agenda del día; programa el búnker y el Wake-Up Check. Devuelve un error o null. */
-    fun commitAgenda(ctx: Context, blocks: List<AgendaBlock>, flexNames: List<String> = emptyList()): String? {
+    fun commitAgenda(ctx: Context, blocks: List<AgendaBlock>, flexNames: List<String> = emptyList(), musts: List<MustTask> = emptyList()): String? {
         val s = AlarmStateStore.get(ctx)
         if (s.phase != AlarmPhase.RITUAL) return "No hay un ritual activo."
-        AgendaValidator.validate(blocks, System.currentTimeMillis(), flexNames.size)?.let { return it }
-        AgendaStore.get(ctx).commit(blocks, flexNames, AlarmScheduler.epochDay())
-        StatsStore.get(ctx).recordCommit(AlarmScheduler.epochDay(), blocks.size + flexNames.distinct().size)
+        AgendaValidator.validate(blocks, System.currentTimeMillis(), flexNames.size + musts.size)?.let { return it }
+        val agenda = AgendaStore.get(ctx)
+        agenda.commit(blocks, flexNames, AlarmScheduler.epochDay())
+        // Las obligatorias se suman a las que ya estuvieran pendientes (nunca se quitan) y bloquean desde su hora de inicio.
+        musts.forEach { if (MustRules.validateAdd(agenda.musts(), it.name) == null) agenda.addMust(it) }
+        StatsStore.get(ctx).recordCommit(AlarmScheduler.epochDay(), blocks.size + flexNames.distinct().size + musts.size)
         AlarmScheduler.scheduleBlocks(ctx)
         if (BunkerStateStore.get(ctx).isActive()) BunkerWatchdogService.start(ctx)
         toCheckWait(ctx, s)

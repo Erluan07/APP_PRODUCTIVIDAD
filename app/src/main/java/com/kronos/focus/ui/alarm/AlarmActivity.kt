@@ -25,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.text.input.KeyboardType
 import com.kronos.focus.domain.agenda.AgendaBlock
+import com.kronos.focus.domain.agenda.MustTask
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -166,6 +167,8 @@ class AlarmActivity : ComponentActivity() {
     private fun Ritual(secondsLeft: Long) {
         val blocks = remember { mutableStateListOf<AgendaBlock>() }
         val flex = remember { mutableStateListOf<String>() }
+        val musts = remember { mutableStateListOf<MustTask>() }
+        var mustMode by remember { mutableStateOf(false) }
         val templates = remember { TemplateStore.get(this@AlarmActivity).all() }
         val external = remember { TaskManagerClient.pending(this@AlarmActivity) }
         var name by remember { mutableStateOf("") }
@@ -205,7 +208,16 @@ class AlarmActivity : ComponentActivity() {
 
             AppCard {
                 SectionTitle("Tu día")
-                if (blocks.isEmpty() && flex.isEmpty()) MutedText("Aún no agregas nada.")
+                if (blocks.isEmpty() && flex.isEmpty() && musts.isEmpty()) MutedText("Aún no agregas nada.")
+                musts.toList().forEach { m ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(m.name, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                            MutedText("Obligatoria · bloquea desde ${fmt.format(Date(m.startMs))} hasta la evidencia")
+                        }
+                        TextAction("Quitar", { musts.remove(m) })
+                    }
+                }
                 blocks.sortedBy { it.startMs }.forEach { b ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
@@ -251,9 +263,9 @@ class AlarmActivity : ComponentActivity() {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(t.name, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
-                                MutedText(if (t.isTimed) "${t.hm(t.startMin!!)} – ${t.hm(t.endMin!!)}" else "Sin hora")
+                                MutedText(if (t.isMust) "Obligatoria desde ${t.hm(t.startMin!!)}" else if (t.isTimed) "${t.hm(t.startMin!!)} – ${t.hm(t.endMin!!)}" else "Sin hora")
                             }
-                            TextAction("Usar", { name = t.name; start = t.startMin; end = t.endMin; error = null })
+                            TextAction("Usar", { name = t.name; start = t.startMin; end = t.endMin; mustMode = t.isMust; error = null })
                         }
                     }
                 }
@@ -261,20 +273,34 @@ class AlarmActivity : ComponentActivity() {
 
             AppCard {
                 SectionTitle("Agregar a mi día")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = !mustMode, onClick = { mustMode = false }, label = { Text("Normal") })
+                    FilterChip(selected = mustMode, onClick = { mustMode = true; end = null }, label = { Text("Obligatoria") })
+                }
                 OutlinedTextField(
                     name, { name = it }, label = { Text("Nombre de la tarea") }, singleLine = true,
                     shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth(),
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    TimeField("Inicio", start, { start = it }, Modifier.weight(1f))
-                    TimeField("Fin", end, { end = it }, Modifier.weight(1f))
+                if (mustMode) {
+                    TimeField("Hora de inicio", start, { start = it }, Modifier.fillMaxWidth())
+                    MutedText("Sin hora de fin: desde esa hora el teléfono se bloquea hasta que la hagas y subas una foto de evidencia. No se puede quitar después de confirmar.")
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        TimeField("Inicio", start, { start = it }, Modifier.weight(1f))
+                        TimeField("Fin", end, { end = it }, Modifier.weight(1f))
+                    }
+                    MutedText("Deja las horas en --:-- (o toca Sin hora) si no sabes cuándo la harás.")
                 }
-                MutedText("Deja las horas en --:-- (o toca Sin hora) si no sabes cuándo la harás.")
                 SoftButton("Agregar a mi día", {
                     val s = start
                     val e = end
                     when {
                         name.isBlank() -> error = "Escribe el nombre de la tarea."
+                        mustMode -> when {
+                            s == null -> error = "Elige la hora de inicio."
+                            musts.any { it.name.equals(name.trim(), true) } -> error = "Ya la agregaste."
+                            else -> { musts.add(MustTask(name.trim(), AgendaValidator.todayAt(s))); name = ""; start = null; end = null; error = null }
+                        }
                         s == null && e == null -> {
                             if (name.trim() !in flex) flex.add(name.trim())
                             name = ""; error = null
@@ -295,8 +321,8 @@ class AlarmActivity : ComponentActivity() {
             }
 
             CtaButton(
-                "Confirmar compromiso", enabled = blocks.isNotEmpty() || flex.isNotEmpty(),
-                onClick = { error = AlarmFlow.commitAgenda(this@AlarmActivity, blocks.toList(), flex.toList()) },
+                "Confirmar compromiso", enabled = blocks.isNotEmpty() || flex.isNotEmpty() || musts.isNotEmpty(),
+                onClick = { error = AlarmFlow.commitAgenda(this@AlarmActivity, blocks.toList(), flex.toList(), musts.toList()) },
                 modifier = Modifier.height(64.dp),
             )
             MutedText("Una vez confirmado no se puede cambiar; solo podrás agregar más tareas durante el día.")
