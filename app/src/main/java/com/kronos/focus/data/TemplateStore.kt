@@ -13,7 +13,7 @@ class TemplateStore private constructor(private val prefs: SharedPreferences) {
         val arr = JSONArray(prefs.getString(KEY, "[]"))
         (0 until arr.length()).map {
             val o = arr.getJSONObject(it)
-            TaskTemplate(o.getString("n"), o.optInt("s", -1).takeIf { v -> v >= 0 }, o.optInt("e", -1).takeIf { v -> v >= 0 })
+            TaskTemplate(o.getString("n"), o.optInt("s", -1).takeIf { v -> v >= 0 }, o.optInt("e", -1).takeIf { v -> v >= 0 }, o.optBoolean("m", false))
         }
     }.getOrDefault(emptyList())
 
