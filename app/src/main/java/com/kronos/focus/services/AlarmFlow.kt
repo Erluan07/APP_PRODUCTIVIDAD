@@ -98,6 +98,8 @@ object AlarmFlow {
         s.phase = AlarmPhase.CHECK_WAIT
         AlarmScheduler.scheduleCheck(ctx, s.checkAtMs)
         AlarmService.sync(ctx)
+        // La vigilancia empieza YA (antes solo empezaba tras confirmar y había 7-10 min para volver a la cama sin que nadie mirara).
+        AwakeWatchService.start(ctx, s.checkAtMs + AppRulesConfig.AWAKE_WATCH_MIN * 60_000L)
     }
 
     /** Llega la hora del Wake-Up Check: cuenta atrás de 90 s. */
@@ -114,15 +116,15 @@ object AlarmFlow {
         if (s.phase != AlarmPhase.CHECK_ACTIVE) return
         s.phase = AlarmPhase.IDLE
         AlarmService.sync(ctx)
-        AwakeWatchService.start(ctx) // vigila que no te vuelvas a dormir
+        if (!AwakeWatchService.running) AwakeWatchService.start(ctx) // respaldo: normalmente ya está vigilando desde el escaneo
     }
 
     /** Te quedaste sin usar el teléfono tras decir "estoy despierto": suena otra vez de inmediato. */
     fun relapse(ctx: Context) {
         val s = AlarmStateStore.get(ctx)
-        if (s.phase != AlarmPhase.IDLE) return
+        if (s.phase == AlarmPhase.RINGING || s.phase == AlarmPhase.RITUAL) return
         resetMute(s)
-        s.ringNote = "Parece que te volviste a dormir: no usaste ni moviste el teléfono en ${AppRulesConfig.AWAKE_IDLE_MIN} min."
+        s.ringNote = "Parece que te volviste a la cama: no caminaste (${AppRulesConfig.AWAKE_MIN_STEPS} pasos cada ${AppRulesConfig.AWAKE_WINDOW_MIN} min). Levántate y vuelve a escanear."
         s.phase = AlarmPhase.RINGING
         AlarmService.sync(ctx)
     }

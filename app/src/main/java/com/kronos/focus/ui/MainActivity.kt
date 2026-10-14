@@ -31,7 +31,15 @@ class MainActivity : ComponentActivity() {
     }
     private val camLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
     private val calLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
-    private val notifLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    private val actLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    private val notifLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { requestSteps() }
+
+    /** Sensor de pasos: la anti-recaída exige caminar. Sin este permiso usa el movimiento del teléfono (menos fiable). */
+    private fun requestSteps() {
+        if (checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
+            actLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+        }
+    }
 
     private fun importText(raw: String) {
         val names = TaskImport.parse(raw)
@@ -61,7 +69,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         com.kronos.focus.ui.theme.UiDesign.load(this)
-        if (Build.VERSION.SDK_INT >= 33) notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        // Primero notificaciones y, al contestar, pasos (dos diálogos de permiso a la vez se pisan).
+        if (Build.VERSION.SDK_INT >= 33) notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) else requestSteps()
         val actions = AppActions(
             importFile = { importLauncher.launch(arrayOf("*/*")) },
             paste = { pasteTasks() },
@@ -69,6 +78,7 @@ class MainActivity : ComponentActivity() {
             openProof = { task, kind -> startActivity(ProofActivity.intent(this, task, kind)) },
             requestCamera = { camLauncher.launch(Manifest.permission.CAMERA) },
             requestCalendar = { calLauncher.launch(Manifest.permission.READ_CALENDAR) },
+            requestSteps = { actLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION) },
         )
         setContent { KronosTheme { AppRoot(actions) } }
     }

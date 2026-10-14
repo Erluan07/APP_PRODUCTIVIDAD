@@ -131,7 +131,7 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
                 "Alarma: " + SimpleDateFormat("EEEE HH:mm", Locale("es")).format(Date(next.timeMs)) + " · puede adelantarse desde las " + fmtHm(early),
             )
         }
-        if (AwakeWatchService.running) StatusPill("Vigilando que no te vuelvas a dormir", Tone.INFO)
+        if (AwakeWatchService.running) StatusPill("Vigilando: camina cada 4 min o vuelve a sonar", Tone.INFO)
 
         // Línea de tiempo del día
         SectionTitle("Tu día")

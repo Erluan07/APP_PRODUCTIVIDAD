@@ -59,6 +59,10 @@ fun SystemSection(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
             CheckRow("Servicio de bloqueo", a11y, if (a11y) "Activo" else "Apagado", "Activar") {
                 ctx.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             }
+            CheckRow(
+                "Sensor de pasos", ctx.checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED,
+                "Para comprobar que caminas después de despertar (sin él es menos fiable)", "Permitir",
+            ) { actions.requestSteps() }
             CheckRow("Cámara", camOk, "Para escanear el QR y las fotos de evidencia", "Permitir") { actions.requestCamera() }
             CheckRow("Calendario", com.kronos.focus.data.CalendarReader.hasPermission(ctx), "Para ver tus reuniones junto a tus tareas", "Permitir") { actions.requestCalendar() }
             CheckRow("Alarma en pantalla completa", fsOk, "Para que la alarma aparezca con la pantalla bloqueada", "Permitir") {

@@ -161,7 +161,6 @@ class BunkerAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        com.kronos.focus.services.AwakeWatchService.noteActivity() // cambiar de ventana = estás usando el teléfono
         val pkg = event.packageName?.toString() ?: return
         // Mientras suena la alarma (o hay Wake-Up Check) nada puede estar delante de la pantalla de alarma.
         if (alarm.uiRequired()) {

@@ -109,11 +109,15 @@ object AppRulesConfig {
     const val SMART_MOVE_DELTA = 0.15f
     const val SMART_MOVE_COUNT = 4
 
-    // ---- Anti-recaída tras despertar ----
-    /** Minutos que se vigila después de confirmar "estoy despierto". */
+    // ---- Anti-recaída: tras el escaneo hay que SEGUIR CAMINANDO (usar el teléfono en la cama ya no cuenta) ----
+    /** Minutos que se vigila DESPUÉS de confirmar "estoy despierto" (la vigilancia empieza antes: desde que escaneas). */
     const val AWAKE_WATCH_MIN = 30L
-    /** Minutos sin usar ni mover el teléfono para considerar que te volviste a dormir y volver a sonar. */
-    const val AWAKE_IDLE_MIN = 10L
+    /** En cada ventana de este tiempo debes dar al menos [AWAKE_MIN_STEPS] pasos con el teléfono encima. */
+    const val AWAKE_WINDOW_MIN = 4L
+    const val AWAKE_MIN_STEPS = 20
+    /** Si no los diste: aviso y, pasados estos segundos sin caminar, vuelve a sonar la alarma completa. */
+    const val AWAKE_GRACE_SEC = 60L
+    /** Sin sensor de pasos: movimiento fuerte del teléfono (delta de aceleración y nº por 30 s) equivale a pasos. */
     const val AWAKE_MOVE_DELTA = 0.6f
     const val AWAKE_MOVE_COUNT = 8
 
