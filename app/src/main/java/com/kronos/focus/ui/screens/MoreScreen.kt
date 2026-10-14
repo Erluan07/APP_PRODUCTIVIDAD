@@ -20,8 +20,13 @@ fun MoreScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
     Column(Modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = tab, containerColor = Color.Transparent, contentColor = MaterialTheme.colorScheme.primary) {
             Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Progreso", style = MaterialTheme.typography.labelLarge) })
-            Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Sistema", style = MaterialTheme.typography.labelLarge) })
+            Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Límites", style = MaterialTheme.typography.labelLarge) })
+            Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("Sistema", style = MaterialTheme.typography.labelLarge) })
         }
-        if (tab == 0) ProgressSection(ctx, now) else SystemSection(ctx, now, a11y, actions)
+        when (tab) {
+            0 -> ProgressSection(ctx, now)
+            1 -> LimitsSection(ctx, now)
+            else -> SystemSection(ctx, now, a11y, actions)
+        }
     }
 }

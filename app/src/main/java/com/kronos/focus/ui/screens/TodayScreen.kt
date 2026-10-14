@@ -73,7 +73,8 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
             MidnightHero(store, now, active, sleeping, remainingSec, a11y,
                 onBunker = { showStart = true },
                 onSleep = { actions.startSleep(); refresh() },
-                onExit = { store.debugClear(); refresh() })
+                onExit = { store.debugClear(); refresh() },
+                onBigScreen = { com.kronos.focus.ui.TimerActivity.open(ctx) })
         } else if (active) {
             HeroCard {
                 Text(if (sleeping) "Modo Dormir" else "Modo Búnker", style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.9f))
@@ -89,6 +90,7 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
                     if (sleeping) "Solo Teléfono y Spotify hasta tu alarma." else "Permitido: Teléfono, WhatsApp, Task Manager IA, Bancolombia, Spotify, Mensajes y Contactos.",
                     style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.92f),
                 )
+                SoftButton("Pantalla grande (horizontal)", { com.kronos.focus.ui.TimerActivity.open(ctx) }, Modifier.fillMaxWidth())
                 if (BuildConfig.TEST_BUILD) {
                     TextButton(
                         onClick = { store.debugClear(); refresh() }, modifier = Modifier.heightIn(min = 48.dp),
@@ -301,7 +303,7 @@ private fun BunkerStartDialog(onDismiss: () -> Unit, onStart: (Long, Boolean) ->
 @Composable
 private fun MidnightHero(
     store: BunkerStateStore, now: Long, active: Boolean, sleeping: Boolean, remainingSec: Long, a11y: Boolean,
-    onBunker: () -> Unit, onSleep: () -> Unit, onExit: () -> Unit,
+    onBunker: () -> Unit, onSleep: () -> Unit, onExit: () -> Unit, onBigScreen: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
         val pomo = if (active && !sleeping) store.pomodoroPhase(now) else null
@@ -324,6 +326,7 @@ private fun MidnightHero(
                 if (sleeping) "Solo Teléfono y Spotify hasta tu alarma."
                 else "Solo tus apps habilitadas, Teléfono y lo esencial del sistema.",
             )
+            SoftButton("Pantalla grande (horizontal)", onBigScreen, Modifier.fillMaxWidth())
             if (BuildConfig.TEST_BUILD) TextAction("Salir del búnker (solo versión de prueba)", onExit)
         } else {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {

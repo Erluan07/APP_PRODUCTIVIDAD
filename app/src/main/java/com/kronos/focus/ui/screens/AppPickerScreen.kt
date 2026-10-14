@@ -18,9 +18,9 @@ import com.kronos.focus.ui.components.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private data class AppItem(val label: String, val pkg: String)
+internal data class AppItem(val label: String, val pkg: String)
 
-private fun installedApps(ctx: Context): List<AppItem> {
+internal fun installedApps(ctx: Context): List<AppItem> {
     val pm = ctx.packageManager
     val launchers = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_ALL)
         .mapNotNull { it.activityInfo?.packageName }.toSet()

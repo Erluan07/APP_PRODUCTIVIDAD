@@ -72,6 +72,16 @@ object AppRulesConfig {
     const val POMODORO_FOCUS_MIN = 50L
     const val POMODORO_BREAK_MIN = 10L
 
+    // ---- Límites de uso por app (pestaña Más → Límites) ----
+    /** Minutos seguidos en una app con límite antes de sacarte de ella. */
+    const val USAGE_CONTINUOUS_MAX_MIN = 15L
+    /** Tras sacarte por uso continuo, la app queda bloqueada estos minutos. */
+    const val USAGE_COOLDOWN_MIN = 10L
+    /** Si sales de la app menos de esto, el uso continuo NO se reinicia (evita el truco de salir y volver a entrar). */
+    const val USAGE_CONTINUOUS_RESET_GAP_SEC = 120L
+    const val USAGE_MIN_LIMIT_MIN = 5
+    const val USAGE_MAX_LIMIT_MIN = 480
+
     // ---- Alarmas: las configuras en la app (pestaña Dormir). Esto solo fija las reglas de edición. ----
     /** Una alarma activa que suena en menos de estas horas no se puede cambiar, apagar ni borrar. */
     const val ALARM_LOCK_HOURS = 3L

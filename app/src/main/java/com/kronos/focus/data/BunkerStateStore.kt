@@ -7,6 +7,9 @@ import java.time.Instant
 import java.time.ZoneId
 import java.util.Calendar
 
+/** [cycle] de [totalCycles]; [nextChangeMs] = cuándo termina la fase actual. */
+data class PomodoroDetail(val focus: Boolean, val remainingSec: Long, val cycle: Int, val totalCycles: Int, val nextChangeMs: Long)
+
 /** Fase del Pomodoro: [focus] = enfoque (true) o descanso (false); [remainingSec] de la fase. */
 data class PomodoroPhase(val focus: Boolean, val remainingSec: Long)
 
@@ -95,6 +98,15 @@ class BunkerStateStore private constructor(
         val focusMs = AppRulesConfig.POMODORO_FOCUS_MIN * 60_000L
         return if (pos < focusMs) PomodoroPhase(true, (focusMs - pos) / 1000)
         else PomodoroPhase(false, (pomoCycleMs() - pos) / 1000)
+    }
+
+    /** Detalle del Pomodoro para la pantalla grande: ciclo actual, cuántos habrá y cuándo cambia la fase. */
+    fun pomodoroDetail(now: Long = System.currentTimeMillis()): PomodoroDetail? {
+        val phase = pomodoroPhase(now) ?: return null
+        val cycleMs = pomoCycleMs()
+        val cycle = ((now - pomoStartMs) / cycleMs).toInt()
+        val totalCycles = (((endsAtMs - pomoStartMs) + cycleMs - 1) / cycleMs).toInt().coerceAtLeast(1)
+        return PomodoroDetail(phase.focus, phase.remainingSec, cycle + 1, totalCycles, minOf(now + phase.remainingSec * 1000L, endsAtMs))
     }
 
     /** Devuelve la fase a anunciar UNA sola vez cuando cambia (enfoque ⇄ descanso); null si no hay cambio. */

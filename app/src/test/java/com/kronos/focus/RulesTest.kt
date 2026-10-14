@@ -8,6 +8,8 @@ import com.kronos.focus.domain.sleep.SleepModel
 import com.kronos.focus.domain.sleep.SleepParams
 import com.kronos.focus.domain.stats.DayStat
 import com.kronos.focus.domain.stats.StreakCalc
+import com.kronos.focus.domain.limits.LimitBlock
+import com.kronos.focus.domain.limits.UsageLimits
 import com.kronos.focus.domain.rules.AppRulesConfig
 import com.kronos.focus.domain.alarm.AlarmEntry
 import com.kronos.focus.domain.alarm.AlarmTimes
@@ -134,6 +136,20 @@ class RulesTest {
         assertTrue("com.sec.android.app.camera" in AppRulesConfig.APP_HELPERS)
         assertFalse("com.android.chrome" in AppRulesConfig.APP_HELPERS)
         assertFalse("com.android.vending" in AppRulesConfig.APP_HELPERS)
+    }
+
+    @Test fun usageLimitBlocksAndTightensOnly() {
+        val now = 1_000_000L
+        assertNull(UsageLimits.blockFor(10 * 60_000L, 30, 0L, now))
+        assertEquals(LimitBlock.DailyExhausted, UsageLimits.blockFor(30 * 60_000L, 30, 0L, now))
+        assertEquals(LimitBlock.Cooldown(now + 5), UsageLimits.blockFor(0L, 30, now + 5, now))
+        assertNull(UsageLimits.blockFor(0L, 30, now - 1, now))                 // el enfriamiento ya pasó
+        assertTrue(UsageLimits.canSet(null, 30))
+        assertTrue(UsageLimits.canSet(30, 20))                                  // endurecer: sí
+        assertFalse(UsageLimits.canSet(30, 45))                                 // aflojar: no
+        assertFalse(UsageLimits.canSet(null, 1))                                // por debajo del mínimo
+        assertFalse(UsageLimits.continuousExceeded(14 * 60_000L))
+        assertTrue(UsageLimits.continuousExceeded(15 * 60_000L))
     }
 
     private fun quiet() = List(6) { Epoch(0, false, false) }

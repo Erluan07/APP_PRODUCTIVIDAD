@@ -74,6 +74,11 @@
 
         <activity android:name=".ui.ProofActivity" android:exported="false" />
 
+        <!-- Cronómetro en pantalla completa y horizontal -->
+        <activity android:name=".ui.TimerActivity" android:exported="false"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout" />
+
         <!-- Fase 1: bloqueo reactivo -->
         <service
             android:name=".services.BunkerAccessibilityService"
