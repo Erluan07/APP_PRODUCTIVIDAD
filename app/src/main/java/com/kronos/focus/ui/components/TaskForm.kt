@@ -38,3 +38,46 @@ fun TaskForm(button: String, onSubmit: (String, Int?, Int?) -> String?, onSucces
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
     }
 }
+
+/** Tarea obligatoria: solo nombre + hora de INICIO. Desde esa hora el teléfono se bloquea hasta subir la evidencia. */
+@Composable
+fun MustTaskForm(onSubmit: (String, Int) -> String?, onSuccess: () -> Unit = {}) {
+    var name by remember { mutableStateOf("") }
+    var start by remember { mutableStateOf<Int?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var confirm by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        OutlinedTextField(
+            name, { name = it }, label = { Text("Tarea obligatoria") }, singleLine = true,
+            shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth(),
+        )
+        TimeField("Hora de inicio", start, { start = it }, Modifier.fillMaxWidth())
+        MutedText("Sin hora de fin. A partir de la hora de inicio el teléfono se bloquea hasta que la hagas y subas una foto de evidencia. No se puede cancelar.")
+        CtaButton("Agregar tarea obligatoria", onClick = {
+            error = when {
+                name.isBlank() -> "Escribe el nombre."
+                start == null -> "Elige la hora de inicio."
+                else -> null
+            }
+            if (error == null) confirm = true
+        })
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
+    }
+    if (confirm) {
+        val s = start ?: 0
+        AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { Text("¿Confirmar tarea obligatoria?") },
+            text = { Text("“${name.trim()}” bloqueará el teléfono desde las %02d:%02d hasta que subas la foto de evidencia. No se puede quitar.".format(s / 60, s % 60)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    val err = onSubmit(name.trim(), s)
+                    confirm = false
+                    error = err
+                    if (err == null) { name = ""; start = null; onSuccess() }
+                }) { Text("Confirmar") }
+            },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text("Revisar") } },
+        )
+    }
+}

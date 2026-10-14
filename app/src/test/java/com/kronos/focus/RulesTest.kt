@@ -8,6 +8,8 @@ import com.kronos.focus.domain.sleep.SleepModel
 import com.kronos.focus.domain.sleep.SleepParams
 import com.kronos.focus.domain.stats.DayStat
 import com.kronos.focus.domain.stats.StreakCalc
+import com.kronos.focus.domain.agenda.MustRules
+import com.kronos.focus.domain.agenda.MustTask
 import com.kronos.focus.domain.limits.LimitBlock
 import com.kronos.focus.domain.limits.UsageLimits
 import com.kronos.focus.domain.rules.AppRulesConfig
@@ -150,6 +152,18 @@ class RulesTest {
         assertFalse(UsageLimits.canSet(null, 1))                                // por debajo del mínimo
         assertFalse(UsageLimits.continuousExceeded(14 * 60_000L))
         assertTrue(UsageLimits.continuousExceeded(15 * 60_000L))
+    }
+
+    @Test fun mustTaskBlocksFromStartUntilDone() {
+        val now = 10_000L
+        val list = listOf(MustTask("Gimnasio", now + 5_000), MustTask("Ya empezada", now - 1, done = false), MustTask("Hecha", now - 9, done = true))
+        assertEquals("Ya empezada", MustRules.activeAt(list, now)?.name)               // la futura no bloquea todavía; la hecha tampoco
+        assertNull(MustRules.activeAt(listOf(MustTask("Gimnasio", now + 5_000)), now))
+        assertEquals("Gimnasio", MustRules.activeAt(listOf(MustTask("Gimnasio", now + 5_000)), now + 5_000)?.name)
+        assertNull(MustRules.activeAt(listOf(MustTask("Gimnasio", now - 1, done = true)), now))
+        assertNotNull(MustRules.validateAdd(list, "  "))
+        assertNotNull(MustRules.validateAdd(list, "gimnasio"))                           // repetida y pendiente
+        assertNull(MustRules.validateAdd(list, "Hecha"))                                 // una ya hecha se puede volver a pedir
     }
 
     private fun quiet() = List(6) { Epoch(0, false, false) }

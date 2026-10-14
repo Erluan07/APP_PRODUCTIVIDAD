@@ -104,6 +104,7 @@ class ProofActivity : ComponentActivity() {
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                     if (ProofStore.get(this@ProofActivity).append(task, kind, file)) {
                         if (kind == KIND_FLEX) AgendaStore.get(this@ProofActivity).setFlexDone(task, true)
+                        if (kind == KIND_MUST) AgendaStore.get(this@ProofActivity).completeMust(task)
                         StatsStore.get(this@ProofActivity).recordDone(AlarmScheduler.epochDay())
                         Toast.makeText(this@ProofActivity, "Evidencia guardada ✔", Toast.LENGTH_LONG).show()
                         finish()
@@ -124,6 +125,7 @@ class ProofActivity : ComponentActivity() {
         const val EXTRA_KIND = "kind"
         const val KIND_FLEX = "flex"
         const val KIND_BLOCK = "block"
+        const val KIND_MUST = "must"
         fun intent(ctx: Context, task: String, kind: String) =
             Intent(ctx, ProofActivity::class.java).putExtra(EXTRA_TASK, task).putExtra(EXTRA_KIND, kind)
     }

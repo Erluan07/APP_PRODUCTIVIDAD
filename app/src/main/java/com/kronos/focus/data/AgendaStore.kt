@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.kronos.focus.domain.agenda.AgendaBlock
 import com.kronos.focus.domain.agenda.FlexTask
+import com.kronos.focus.domain.agenda.MustRules
+import com.kronos.focus.domain.agenda.MustTask
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -12,6 +14,29 @@ class AgendaStore private constructor(private val prefs: SharedPreferences) {
 
     @Volatile private var blocksCache: List<AgendaBlock>? = null
     @Volatile private var flexCache: List<FlexTask>? = null
+    @Volatile private var mustCache: List<MustTask>? = null
+
+    /** Tareas obligatorias (con inicio, sin fin): bloquean el teléfono desde su hora hasta tener la evidencia. */
+    fun musts(): List<MustTask> = mustCache ?: readMusts().also { mustCache = it }
+
+    private fun readMusts(): List<MustTask> = runCatching {
+        val arr = JSONArray(prefs.getString(KEY_MUST, "[]"))
+        (0 until arr.length()).map { val o = arr.getJSONObject(it); MustTask(o.getString("n"), o.getLong("s"), o.optBoolean("d", false)) }
+    }.getOrDefault(emptyList())
+
+    private fun saveMusts(list: List<MustTask>) {
+        val arr = JSONArray()
+        list.forEach { arr.put(JSONObject().put("n", it.name).put("s", it.startMs).put("d", it.done)) }
+        mustCache = list
+        prefs.edit().putString(KEY_MUST, arr.toString()).apply()
+    }
+
+    /** Solo agrega. No existe forma de quitar una tarea obligatoria: solo se completa con evidencia. */
+    fun addMust(t: MustTask) = saveMusts(musts() + t)
+
+    fun completeMust(name: String) = saveMusts(musts().map { if (!it.done && it.name == name) it.copy(done = true) else it })
+
+    fun activeMust(now: Long): MustTask? = MustRules.activeAt(musts(), now)
 
     /** Se lee de las preferencias una sola vez (la UI y el servicio de bloqueo lo consultan muchas veces por segundo). */
     fun blocks(): List<AgendaBlock> = blocksCache ?: readBlocks().also { blocksCache = it }
@@ -65,7 +90,7 @@ class AgendaStore private constructor(private val prefs: SharedPreferences) {
 
     fun activeBlockAt(now: Long): AgendaBlock? = blocks().firstOrNull { now >= it.startMs && now < it.endMs }
 
-    fun futureStarts(now: Long): List<Long> = blocks().map { it.startMs }.filter { it > now }
+    fun futureStarts(now: Long): List<Long> = (blocks().map { it.startMs } + musts().filter { !it.done }.map { it.startMs }).filter { it > now }
 
     /** Solo builds debug (UI). */
     fun clear() { blocksCache = emptyList(); flexCache = emptyList(); prefs.edit().remove(KEY_BLOCKS).remove(KEY_DAY).remove(KEY_FLEX).apply() }
@@ -74,6 +99,7 @@ class AgendaStore private constructor(private val prefs: SharedPreferences) {
         private const val KEY_BLOCKS = "blocks"
         private const val KEY_DAY = "committed_day"
         private const val KEY_FLEX = "flex"
+        private const val KEY_MUST = "must"
         @Volatile private var instance: AgendaStore? = null
         fun get(context: Context): AgendaStore = instance ?: synchronized(this) {
             instance ?: AgendaStore(

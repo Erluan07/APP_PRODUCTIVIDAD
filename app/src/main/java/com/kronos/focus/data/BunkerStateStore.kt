@@ -15,7 +15,7 @@ data class PomodoroPhase(val focus: Boolean, val remainingSec: Long)
 
 /**
  * Estado del Modo Búnker en almacenamiento *device-protected* (accesible en Direct Boot).
- * No expone cancelación: solo se puede extender (con tope). [debugClear] solo lo llama la UI en builds debug.
+ * No expone cancelación: solo se puede extender (con tope).
  */
 class BunkerStateStore private constructor(
     private val prefs: SharedPreferences,
@@ -48,7 +48,10 @@ class BunkerStateStore private constructor(
 
     /** Activo si hay un búnker manual, un bloque de la agenda (salvo en la pausa fija) o el Modo Dormir. */
     fun isActive(now: Long = System.currentTimeMillis()): Boolean =
-        ((now < endsAtMs || agenda.activeBlockAt(now) != null) && !inFreeWindow(now)) || isSleepMode(now)
+        ((now < endsAtMs || agenda.activeBlockAt(now) != null) && !inFreeWindow(now)) || isSleepMode(now) || mustActive(now)
+
+    /** Hay una tarea obligatoria iniciada y sin evidencia: bloquea sin importar la pausa fija ni la hora. */
+    fun mustActive(now: Long = System.currentTimeMillis()): Boolean = agenda.activeMust(now) != null
 
     fun remainingMs(now: Long = System.currentTimeMillis()): Long =
         maxOf(endsAtMs - now, (agenda.activeBlockAt(now)?.endMs ?: 0L) - now, if (isSleepMode(now)) sleepEndMs - now else 0L, 0L)
@@ -139,14 +142,6 @@ class BunkerStateStore private constructor(
         if (bootCount == prefs.getInt(KEY_PENALTY_BOOT, -2)) return
         prefs.edit().putInt(KEY_PENALTY_BOOT, bootCount).apply()
         if (isActive()) applyPenalty(minutes) else startSession(minutes)
-    }
-
-    /** SOLO builds de prueba: salida de emergencia. NO toca la agenda (antes la borraba y se perdían las tareas del día). */
-    fun debugClear() {
-        endsAtMs = 0L
-        prefs.edit().putLong(KEY_ENDS_AT, 0L).apply()
-        setPomodoro(0L)
-        endSleep()
     }
 
     // ---- Diagnóstico / registro de intentos ----

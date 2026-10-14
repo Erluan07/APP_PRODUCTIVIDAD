@@ -12,6 +12,7 @@ import android.os.IBinder
 import android.os.Looper
 import com.kronos.focus.R
 import com.kronos.focus.admin.DeviceOwnerHardening
+import com.kronos.focus.data.AgendaStore
 import com.kronos.focus.data.BunkerStateStore
 import com.kronos.focus.domain.rules.AppRulesConfig
 import com.kronos.focus.ui.MainActivity
@@ -24,11 +25,15 @@ class BunkerWatchdogService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var store: BunkerStateStore
     private var warned = false
+    private var lastMust: String? = null
 
     private val tick = object : Runnable {
         override fun run() {
             DeviceOwnerHardening.sync(this@BunkerWatchdogService, store.isActive())
-            if (store.remainingMs() <= 0L) { stopSelf(); return }
+            if (store.remainingMs() <= 0L && !store.mustActive()) { stopSelf(); return }
+            AgendaStore.get(this@BunkerWatchdogService).activeMust(System.currentTimeMillis())?.let {
+                if (it.name != lastMust) { lastMust = it.name; notifyMust(it.name) }
+            }
             store.pomodoroTransition()?.let { notifyPomodoro(it.focus) }
             if (store.isActive() && !AccessibilityGuard.isEnabled(this@BunkerWatchdogService)) {
                 if (!AccessibilityGuard.tryEnable(this@BunkerWatchdogService)) {
@@ -51,6 +56,16 @@ class BunkerWatchdogService : Service() {
             .setContentText("Modo Búnker vigilando")
             .setOngoing(true).build())
         handler.post(tick)
+    }
+
+    private fun notifyMust(name: String) {
+        val pi = PendingIntent.getActivity(this, 2, Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        getSystemService(NotificationManager::class.java).notify(6, Notification.Builder(this, ALERT)
+            .setSmallIcon(android.R.drawable.ic_lock_lock)
+            .setContentTitle("Tarea obligatoria: $name")
+            .setContentText("El teléfono queda bloqueado hasta que subas la foto de evidencia.")
+            .setContentIntent(pi).setAutoCancel(true).build())
     }
 
     /** Pomodoro: solo avisa; el bloqueo de apps sigue igual durante el descanso. */

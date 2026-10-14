@@ -57,6 +57,9 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
     val active = store.isActive(now)
     val sleeping = store.isSleepMode(now)
     val remainingSec = store.remainingMs(now) / 1000
+    val mustNow = remember(now / 1000L, showAdd) { agenda.activeMust(now) }
+    // Bloqueado solo por una tarea obligatoria (no hay cuenta atrás que mostrar).
+    val mustOnlyName = if (active && !sleeping && remainingSec <= 0L) mustNow?.name else null
     val calOk = CalendarReader.hasPermission(ctx)
     val events = remember(now / 60_000L, calOk) { CalendarReader.eventsForDay(ctx, now) }
     val dateText = remember(now / 3_600_000L) {
@@ -73,12 +76,13 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
             MidnightHero(store, now, active, sleeping, remainingSec, a11y,
                 onBunker = { showStart = true },
                 onSleep = { actions.startSleep(); refresh() },
-                onExit = { store.debugClear(); refresh() },
-                onBigScreen = { com.kronos.focus.ui.TimerActivity.open(ctx) })
+                onBigScreen = { com.kronos.focus.ui.TimerActivity.open(ctx) },
+                mustName = mustOnlyName)
         } else if (active) {
             HeroCard {
                 Text(if (sleeping) "Modo Dormir" else "Modo Búnker", style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.9f))
-                Text(fmtCountdown(remainingSec), style = MaterialTheme.typography.displayMedium, color = Color.White)
+                if (mustOnlyName != null) Text("Pendiente: $mustOnlyName", style = MaterialTheme.typography.titleLarge, color = Color.White)
+                else Text(fmtCountdown(remainingSec), style = MaterialTheme.typography.displayMedium, color = Color.White)
                 val pomo = if (sleeping) null else store.pomodoroPhase(now)
                 pomo?.let {
                     Text(
@@ -91,12 +95,6 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
                     style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.92f),
                 )
                 SoftButton("Pantalla grande (horizontal)", { com.kronos.focus.ui.TimerActivity.open(ctx) }, Modifier.fillMaxWidth())
-                if (BuildConfig.TEST_BUILD) {
-                    TextButton(
-                        onClick = { store.debugClear(); refresh() }, modifier = Modifier.heightIn(min = 48.dp),
-                        colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
-                    ) { Text("Salir del búnker (solo versión de prueba)") }
-                }
             }
         } else {
             HeroCard {
@@ -106,6 +104,22 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
                 CtaButton("Me voy a dormir (Modo Dormir)", enabled = a11y, icon = Icons.Filled.Notifications, onClick = {
                     actions.startSleep(); refresh()
                 })
+            }
+        }
+
+        // Tareas obligatorias pendientes: bloquean el teléfono desde su hora hasta subir la evidencia
+        val musts = remember(now / 1000L, showAdd) { agenda.musts().filter { !it.done } }
+        if (musts.isNotEmpty()) {
+            SectionTitle("Tareas obligatorias", "El teléfono se bloquea desde la hora de inicio hasta que subas la foto de evidencia.")
+            musts.forEach { m ->
+                val started = now >= m.startMs
+                AppCard {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(m.name, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                        StatusPill(if (started) "Bloqueando desde ${fmtHm(m.startMs)}" else "Empieza ${fmtHm(m.startMs)}", if (started) Tone.ERROR else Tone.INFO)
+                    }
+                    CtaButton("Ya la hice · tomar foto", { actions.openProof(m.name, ProofActivity.KIND_MUST) })
+                }
             }
         }
 
@@ -216,11 +230,22 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
         ModalBottomSheet(onDismissRequest = { showAdd = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
             Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp).navigationBarsPadding().imePadding(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Agregar a hoy", style = MaterialTheme.typography.titleLarge)
-                MutedText("Solo se pueden agregar tareas; las ya confirmadas no se quitan.")
-                TaskForm("Agregar a mi día", onSubmit = { n, s, e ->
-                    if (s == null || e == null) AgendaActions.addFlex(ctx, n)
-                    else AgendaActions.addBlock(ctx, AgendaBlock(n, AgendaValidator.todayAt(s), AgendaValidator.todayAt(e)))
-                }, onSuccess = { showAdd = false })
+                var mustMode by remember { mutableStateOf(false) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = !mustMode, onClick = { mustMode = false }, label = { Text("Tarea normal") })
+                    FilterChip(selected = mustMode, onClick = { mustMode = true }, label = { Text("Obligatoria") })
+                }
+                if (mustMode) {
+                    MustTaskForm(onSubmit = { n, startMin ->
+                        AgendaActions.addMust(ctx, n, AgendaValidator.todayAt(startMin)).also { if (it == null) refresh() }
+                    }, onSuccess = { showAdd = false })
+                } else {
+                    MutedText("Solo se pueden agregar tareas; las ya confirmadas no se quitan.")
+                    TaskForm("Agregar a mi día", onSubmit = { n, s, e ->
+                        if (s == null || e == null) AgendaActions.addFlex(ctx, n)
+                        else AgendaActions.addBlock(ctx, AgendaBlock(n, AgendaValidator.todayAt(s), AgendaValidator.todayAt(e)))
+                    }, onSuccess = { showAdd = false })
+                }
             }
         }
     }
@@ -303,12 +328,16 @@ private fun BunkerStartDialog(onDismiss: () -> Unit, onStart: (Long, Boolean) ->
 @Composable
 private fun MidnightHero(
     store: BunkerStateStore, now: Long, active: Boolean, sleeping: Boolean, remainingSec: Long, a11y: Boolean,
-    onBunker: () -> Unit, onSleep: () -> Unit, onExit: () -> Unit, onBigScreen: () -> Unit,
+    onBunker: () -> Unit, onSleep: () -> Unit, onBigScreen: () -> Unit, mustName: String?,
 ) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
         val pomo = if (active && !sleeping) store.pomodoroPhase(now) else null
         FocusRing(progress = if (active) store.progress(now) else 0f) {
-            if (active) {
+            if (active && mustName != null) {
+                Text("OBLIGATORIA", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Text(mustName, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = 2)
+                MutedText("bloqueado hasta la evidencia")
+            } else if (active) {
                 Text(
                     if (sleeping) "MODO DORMIR" else if (pomo != null) (if (pomo.focus) "ENFOQUE" else "DESCANSO") else "BÚNKER",
                     style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary,
@@ -323,11 +352,11 @@ private fun MidnightHero(
         }
         if (active) {
             MutedText(
-                if (sleeping) "Solo Teléfono y Spotify hasta tu alarma."
+                if (mustName != null) "Hasta que subas la foto de evidencia solo funcionan tus apps habilitadas."
+                else if (sleeping) "Solo Teléfono y Spotify hasta tu alarma."
                 else "Solo tus apps habilitadas, Teléfono y lo esencial del sistema.",
             )
             SoftButton("Pantalla grande (horizontal)", onBigScreen, Modifier.fillMaxWidth())
-            if (BuildConfig.TEST_BUILD) TextAction("Salir del búnker (solo versión de prueba)", onExit)
         } else {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 ActionTile("Modo Búnker", "Elige el tiempo", Icons.Filled.Lock, onBunker, Modifier.weight(1f), enabled = a11y)
