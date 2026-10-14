@@ -110,7 +110,7 @@ fun TasksScreen(ctx: Context, now: Long, actions: AppActions) {
             title = { Text("¿Sumar “${t.name}” a hoy?") },
             text = { Text("Bloqueará el teléfono desde las ${t.hm(t.startMin!!)} (si ya pasó, desde ahora) hasta que subas la foto de evidencia. No se puede cancelar.") },
             confirmButton = {
-                TextAction("Confirmar", { msg = AgendaActions.addMust(ctx, t.name, AgendaValidator.todayAt(t.startMin)); confirmMust = null })
+                TextAction("Confirmar", { msg = AgendaActions.addMust(ctx, t.name, AgendaValidator.todayAt(t.startMin!!)); confirmMust = null })
             },
             dismissButton = { TextAction("Cancelar", { confirmMust = null }) },
         )
