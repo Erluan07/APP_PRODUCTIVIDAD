@@ -51,9 +51,13 @@ fun AppRoot(actions: AppActions) {
     var a11y by remember { mutableStateOf(AccessibilityGuard.isEnabled(ctx)) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val refresh = remember { { now = System.currentTimeMillis() } }
-    LaunchedEffect(lifecycle) {
+    val store = remember { BunkerStateStore.get(ctx) }
+    // La cuenta atrás se ve solo en "Hoy" con algo activo. Este valor es la CLAVE del bucle: cuando cambia
+    // (empieza el búnker, cambias de pestaña…) el bucle se reinicia al instante en vez de esperar su pausa de 5 s.
+    // (Antes, un bucle dormido en una pausa larga dejaba el cronómetro congelado hasta cambiar de pestaña.)
+    val countdown = tab == 0 && remember(now) { store.isActive(now) }
+    LaunchedEffect(lifecycle, countdown) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            val store = BunkerStateStore.get(ctx)
             while (true) {
                 now = System.currentTimeMillis()
                 // Lecturas de Settings y Device Owner fuera del hilo principal para no frenar el dibujado.
@@ -62,8 +66,7 @@ fun AppRoot(actions: AppActions) {
                     AccessibilityGuard.isEnabled(ctx)
                 }
                 if (enabled != a11y) a11y = enabled
-                // Solo hace falta repintar cada segundo cuando hay una cuenta atrás visible; si no, cada 10 s.
-                delay(if (store.isActive(now) && tab == 0) 1000L else 10_000L)
+                delay(if (countdown) 1000L else 5_000L)
             }
         }
     }
