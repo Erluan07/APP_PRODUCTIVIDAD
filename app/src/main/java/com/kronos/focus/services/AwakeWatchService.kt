@@ -53,19 +53,58 @@ class AwakeWatchService : Service(), SensorEventListener {
             val now = System.currentTimeMillis()
             if (AlarmStateStore.get(this@AwakeWatchService).phase == AlarmPhase.RINGING) { stopSelf(); return } // ya está sonando
             if (now >= endMs) { stopSelf(); return }
-            if (!stepMode && moves >= AppRulesConfig.AWAKE_MOVE_COUNT) steps += 5
+            if (!stepMode && moves >= AppRulesConfig.AWAKE_MOVE_COUNT) { steps += 5; publish() }
             moves = 0
+            evaluateGoal(now)
             when {
-                steps >= AppRulesConfig.AWAKE_MIN_STEPS -> { steps = 0; windowStartMs = now; warned = false } // caminaste: ventana nueva
                 !warned && now - windowStartMs >= AppRulesConfig.AWAKE_WINDOW_MIN * 60_000L -> {
                     warned = true
                     graceUntilMs = now + AppRulesConfig.AWAKE_GRACE_SEC * 1000L
+                    publish()
                     warn()
                 }
                 warned && now >= graceUntilMs -> { AlarmFlow.relapse(this@AwakeWatchService); stopSelf(); return }
             }
-            handler.postDelayed(this, 10_000L)
+            refreshNotification()
+            handler.postDelayed(this, 5_000L)
         }
+    }
+
+    /** Si ya diste los pasos de esta ventana, se anota como cumplida y empieza una nueva (se llama al instante en cada paso). */
+    private fun evaluateGoal(now: Long) {
+        if (steps < AppRulesConfig.AWAKE_MIN_STEPS) return
+        AwakeStatus.windowsDone += 1
+        AwakeStatus.lastSuccessMs = now
+        steps = 0; windowStartMs = now; warned = false; graceUntilMs = 0L
+        publish()
+        refreshNotification()
+    }
+
+    private fun publish() {
+        AwakeStatus.steps = steps
+        AwakeStatus.windowEndMs = windowStartMs + AppRulesConfig.AWAKE_WINDOW_MIN * 60_000L
+        AwakeStatus.graceUntilMs = if (warned) graceUntilMs else 0L
+        AwakeStatus.endMs = endMs
+    }
+
+    private fun buildNotification(text: String): Notification =
+        Notification.Builder(this, "awake")
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setContentTitle("Monitoreo: me estoy levantando")
+            .setContentText(text)
+            .setOnlyAlertOnce(true).setOngoing(true).build()
+
+    private var lastNotifyMs = 0L
+
+    /** La notificación fija muestra el avance en vivo (se ve con el teléfono bloqueado). Como mucho una vez por segundo. */
+    private fun refreshNotification(force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (!force && now - lastNotifyMs < 1000L) return
+        lastNotifyMs = now
+        val left = ((windowStartMs + AppRulesConfig.AWAKE_WINDOW_MIN * 60_000L - now) / 1000).coerceAtLeast(0)
+        val text = if (warned) "¡Camina ya! Pasos $steps/${AppRulesConfig.AWAKE_MIN_STEPS}"
+        else "Pasos $steps/${AppRulesConfig.AWAKE_MIN_STEPS} · ventana %d:%02d · cumplidas ${AwakeStatus.windowsDone}".format(left / 60, left % 60)
+        getSystemService(NotificationManager::class.java).notify(4, buildNotification(text))
     }
 
     private fun warn() {
@@ -84,31 +123,37 @@ class AwakeWatchService : Service(), SensorEventListener {
         val until = intent?.getLongExtra(EXTRA_END, 0L) ?: 0L
         val now = System.currentTimeMillis()
         endMs = if (until > now) until else now + AppRulesConfig.AWAKE_WATCH_MIN * 60_000L
-        windowStartMs = now; steps = 0; warned = false
-        if (started) return START_NOT_STICKY   // reinicio de la vigilancia (nuevo escaneo): solo se actualizan fin y ventana
+        windowStartMs = now; steps = 0; warned = false; graceUntilMs = 0L
+        AwakeStatus.windowsDone = 0; AwakeStatus.lastSuccessMs = 0L
+        publish()
+        if (started) { refreshNotification(force = true); return START_NOT_STICKY }   // reinicio (nuevo escaneo): solo se actualizan fin y ventana
         started = true; running = true
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel("awake", "Vigilando que sigas despierto", NotificationManager.IMPORTANCE_LOW))
         nm.createNotificationChannel(NotificationChannel("awake_warn", "Aviso: camina", NotificationManager.IMPORTANCE_HIGH))
-        val n = Notification.Builder(this, "awake")
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle(getString(R.string.app_name))
-            .setContentText("Vigilando que sigas despierto: camina un poco cada ${AppRulesConfig.AWAKE_WINDOW_MIN} min")
-            .setOngoing(true).build()
+        val n = buildNotification("Camina ${AppRulesConfig.AWAKE_MIN_STEPS} pasos cada ${AppRulesConfig.AWAKE_WINDOW_MIN} min")
+        AwakeStatus.active = true
         if (Build.VERSION.SDK_INT >= 34) startForeground(4, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE) else startForeground(4, n)
         wl = getSystemService(PowerManager::class.java).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "kronos:awakewatch")
             .apply { acquire((AppRulesConfig.AWAKE_WATCH_MIN + 25) * 60_000L) }
         sm = getSystemService(SensorManager::class.java)
         val stepSensor = if (checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED)
             sm?.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR) else null
+        AwakeStatus.realSteps = stepSensor != null
         if (stepSensor != null) { stepMode = true; sm?.registerListener(this, stepSensor, SensorManager.SENSOR_DELAY_NORMAL) }
         else sm?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let { sm?.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) }
-        handler.postDelayed(tick, 10_000L)
+        handler.postDelayed(tick, 5_000L)
         return START_NOT_STICKY
     }
 
     override fun onSensorChanged(e: SensorEvent) {
-        if (e.sensor.type == Sensor.TYPE_STEP_DETECTOR) { steps++; return }
+        if (e.sensor.type == Sensor.TYPE_STEP_DETECTOR) {
+            steps++
+            publish()
+            evaluateGoal(System.currentTimeMillis())   // al llegar a la meta se anota al instante
+            refreshNotification()
+            return
+        }
         if (hasLast) {
             val d = abs(e.values[0] - last[0]) + abs(e.values[1] - last[1]) + abs(e.values[2] - last[2])
             if (d > AppRulesConfig.AWAKE_MOVE_DELTA) moves++
@@ -121,6 +166,8 @@ class AwakeWatchService : Service(), SensorEventListener {
 
     override fun onDestroy() {
         running = false
+        AwakeStatus.active = false
+        AwakeStatus.steps = 0
         handler.removeCallbacksAndMessages(null)
         runCatching { sm?.unregisterListener(this) }
         wl?.let { if (it.isHeld) it.release() }
@@ -138,4 +185,17 @@ class AwakeWatchService : Service(), SensorEventListener {
 
         fun stop(ctx: Context) { runCatching { ctx.stopService(Intent(ctx, AwakeWatchService::class.java)) } }
     }
+}
+
+/** Estado en vivo del monitoreo "me estoy levantando" (lo lee la pantalla Hoy cada segundo). */
+object AwakeStatus {
+    @Volatile var active = false
+    @Volatile var steps = 0                 // pasos en la ventana actual
+    @Volatile var goal = AppRulesConfig.AWAKE_MIN_STEPS
+    @Volatile var windowEndMs = 0L          // cuándo termina la ventana actual
+    @Volatile var graceUntilMs = 0L         // > 0: ya hubo aviso y falta poco para que suene la alarma
+    @Volatile var endMs = 0L                // cuándo termina toda la vigilancia
+    @Volatile var windowsDone = 0           // ventanas cumplidas
+    @Volatile var lastSuccessMs = 0L
+    @Volatile var realSteps = true          // false = estimado por movimiento (sin sensor de pasos)
 }

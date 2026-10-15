@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -24,6 +26,7 @@ import com.kronos.focus.domain.agenda.AgendaValidator
 import com.kronos.focus.services.AccessibilityGuard
 import com.kronos.focus.services.AgendaActions
 import com.kronos.focus.services.AlarmScheduler
+import com.kronos.focus.services.AwakeStatus
 import com.kronos.focus.services.AwakeWatchService
 import com.kronos.focus.services.BunkerWatchdogService
 import com.kronos.focus.domain.rules.AppRulesConfig
@@ -71,6 +74,8 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
             Text(dateText, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onBackground)
             StatusPill(if (active) (if (sleeping) "Dormir" else "Búnker") else "Libre", if (active) Tone.INFO else Tone.OK)
         }
+
+        if (AwakeStatus.active) AwakeMonitorCard(now)
 
         if (midnight) {
             MidnightHero(store, now, active, sleeping, remainingSec, a11y,
@@ -363,5 +368,56 @@ private fun MidnightHero(
                 ActionTile("Me voy a dormir", "Hasta tu alarma", Icons.Filled.Notifications, onSleep, Modifier.weight(1f), enabled = a11y)
             }
         }
+    }
+}
+
+/**
+ * Monitoreo "me estoy levantando": los pasos de la ventana actual en vivo (un punto por paso), cuántos faltan,
+ * el tiempo que queda de la ventana y cuántas llevas cumplidas. Solo aparece mientras la vigilancia está activa.
+ */
+@Composable
+private fun AwakeMonitorCard(now: Long) {
+    val goal = AwakeStatus.goal
+    val steps = AwakeStatus.steps.coerceIn(0, goal)
+    val warned = AwakeStatus.graceUntilMs > 0L
+    val windowLeft = ((AwakeStatus.windowEndMs - now) / 1000).coerceAtLeast(0)
+    val graceLeft = ((AwakeStatus.graceUntilMs - now) / 1000).coerceAtLeast(0)
+    val recentlyDone = now - AwakeStatus.lastSuccessMs < 8_000L && AwakeStatus.lastSuccessMs > 0L
+    val endLeftMin = ((AwakeStatus.endMs - now) / 60_000L).coerceAtLeast(0)
+    AppCard {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Monitoreo: me estoy levantando", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+            when {
+                warned -> StatusPill("¡Camina ya!", Tone.ERROR)
+                recentlyDone -> StatusPill("Ventana cumplida ✔", Tone.OK)
+                else -> StatusPill("En marcha", Tone.INFO)
+            }
+        }
+        // Un punto por paso: se van llenando en vivo.
+        for (rowStart in 0 until goal step 10) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                for (i in rowStart until minOf(rowStart + 10, goal)) {
+                    Box(
+                        Modifier.size(22.dp).clip(CircleShape).background(
+                            if (i < steps) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    )
+                }
+            }
+        }
+        Text(
+            if (recentlyDone) "¡Meta cumplida! Empieza una ventana nueva." else "$steps de $goal pasos · faltan ${goal - steps}",
+            style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface,
+        )
+        if (warned) {
+            MutedText("Si no caminas, la alarma vuelve a sonar en ${graceLeft}s.")
+        } else {
+            MutedText("Tiempo de esta ventana: %d:%02d. Si no llegas a $goal pasos, sonará un aviso.".format(windowLeft / 60, windowLeft % 60))
+            LinearProgressIndicator(
+                progress = { (windowLeft / (AppRulesConfig.AWAKE_WINDOW_MIN * 60f)).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        MutedText("Ventanas cumplidas: ${AwakeStatus.windowsDone} · la vigilancia termina en $endLeftMin min" +
+            if (!AwakeStatus.realSteps) " · sin sensor de pasos: estimado por movimiento" else "")
     }
 }
