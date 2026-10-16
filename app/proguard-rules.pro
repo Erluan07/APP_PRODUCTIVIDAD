@@ -7,3 +7,6 @@
 -keep class com.google.ai.edge.litertlm.** { *; }
 -keep class com.kronos.focus.vision.** { *; }
 -dontwarn com.google.ai.edge.litertlm.**
+# Trazas legibles (útil mientras la app esté en pruebas).
+-dontobfuscate
+-keepattributes SourceFile,LineNumberTable

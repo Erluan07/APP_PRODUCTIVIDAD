@@ -75,6 +75,21 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
             StatusPill(if (active) (if (sleeping) "Dormir" else "Búnker") else "Libre", if (active) Tone.INFO else Tone.OK)
         }
 
+        var crash by remember { mutableStateOf(com.kronos.focus.CrashLog.last(ctx)) }
+        crash?.let { text ->
+            val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+            AppCard {
+                SectionTitle("La app se cerró la última vez", "Copia este texto y mándaselo a Claude para arreglarlo.")
+                androidx.compose.foundation.text.selection.SelectionContainer {
+                    Text(text.take(1500), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SoftButton("Copiar", { clipboard.setText(androidx.compose.ui.text.AnnotatedString(text)) }, Modifier.weight(1f))
+                    SoftButton("Descartar", { com.kronos.focus.CrashLog.clear(ctx); crash = null }, Modifier.weight(1f))
+                }
+            }
+        }
+
         if (AwakeStatus.active) AwakeMonitorCard(now)
 
         if (midnight) {
