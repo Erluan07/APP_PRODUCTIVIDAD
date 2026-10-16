@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ===== Hardware ===== -->
+    <uses-feature android:name="android.hardware.camera" android:required="true" />
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+    <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />
+
+    <!-- ===== Fase 1: bloqueo ===== -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Se concede por ADB (ver docs/PLAN_MAESTRO.md): permite activar el AccessibilityService sin tocar Ajustes -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- ===== Fase 2: alarma ===== -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+
+    <!-- ===== Fase 4: Proof of Work ===== -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+
+    <!-- ===== Fase 5: Boot Trap ===== -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+
+    <!-- Visibilidad de paquetes para resolver launcher/IME/dialer (Android 11+) -->
+    <queries>
+        <intent><action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" /></intent>
+        <intent><action android:name="android.intent.action.DIAL" /></intent>
+        <!-- Para listar tus apps y elegir cuáles quedan habilitadas en el búnker -->
+        <intent><action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" /></intent>
+        <!-- App de tareas (Task Manager IA): proveedor de solo lectura -->
+        <provider android:authorities="com.erluan.taskmanageria.tasks" />
+    </queries>
+
+    <application
+        android:name=".KronosApp"
+        android:label="@string/app_name"
+        android:allowBackup="false"
+        android:directBootAware="true"
+        android:supportsRtl="true"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:theme="@style/Theme.Kronos">
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:directBootAware="true"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".ui.ProofActivity" android:exported="false" />
+
+        <!-- Analizador de fotos con IA local: en su propio proceso para que un fallo nativo no tumbe el bloqueo -->
+        <service android:name=".vision.VisionService" android:exported="false" android:process=":vision" />
+        <uses-native-library android:name="libvndksupport.so" android:required="false" />
+        <uses-native-library android:name="libOpenCL.so" android:required="false" />
+
+        <!-- Cronómetro en pantalla completa y horizontal -->
+        <activity android:name=".ui.TimerActivity" android:exported="false"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout" />
+
+        <!-- Fase 1: bloqueo reactivo -->
+        <service
+            android:name=".services.BunkerAccessibilityService"
+            android:exported="true"
+            android:directBootAware="true"
+            android:label="@string/accessibility_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <service
+            android:name=".services.BunkerWatchdogService"
+            android:exported="false"
+            android:directBootAware="true"
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Vigila que el bloqueo de distracciones siga activo" />
+        </service>
+
+        <!-- Fase 5: Device Owner -->
+        <receiver
+            android:name=".admin.KronosDeviceAdminReceiver"
+            android:exported="true"
+            android:directBootAware="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Fase 5: Boot Trap (Direct Boot: dispara antes del primer desbloqueo) -->
+        <receiver
+            android:name=".receivers.BootReceiver"
+            android:exported="true"
+            android:directBootAware="true">
+            <intent-filter android:priority="999">
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
+        <service android:name=".services.AwakeWatchService" android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Vigila que el usuario siga despierto tras apagar la alarma" />
+        </service>
+
+        <!-- Fase 2: alarma -->
+        <service android:name=".services.AlarmService" android:exported="false"
+            android:directBootAware="true" android:foregroundServiceType="mediaPlayback" />
+        <service android:name=".services.SleepTrackService" android:exported="false"
+            android:foregroundServiceType="specialUse|microphone">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Seguimiento de sueño con acelerómetro y volumen para despertar en sueño ligero" />
+        </service>
+        <receiver android:name=".receivers.AlarmReceiver" android:exported="false"
+            android:directBootAware="true" />
+        <activity android:name=".ui.alarm.AlarmActivity" android:exported="false"
+            android:directBootAware="true" android:showWhenLocked="true" android:turnScreenOn="true"
+            android:launchMode="singleTask" android:excludeFromRecents="true"
+            android:windowSoftInputMode="adjustResize" />
+    </application>
+</manifest>
