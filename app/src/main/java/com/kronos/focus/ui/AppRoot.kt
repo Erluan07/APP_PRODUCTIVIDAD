@@ -57,7 +57,9 @@ fun AppRoot(actions: AppActions) {
     // La cuenta atrás se ve solo en "Hoy" con algo activo. Este valor es la CLAVE del bucle: cuando cambia
     // (empieza el búnker, cambias de pestaña…) el bucle se reinicia al instante en vez de esperar su pausa de 5 s.
     // (Antes, un bucle dormido en una pausa larga dejaba el cronómetro congelado hasta cambiar de pestaña.)
-    val countdown = tab == 0 && (remember(now) { store.isActive(now) } || com.kronos.focus.services.AwakeStatus.active)
+    // OJO: `remember` siempre se llama (nunca dentro de un && / ||); si no, al cambiar de pestaña Compose desalinea sus posiciones y falla.
+    val bunkerActive = remember(now) { store.isActive(now) }
+    val countdown = tab == 0 && (bunkerActive || com.kronos.focus.services.AwakeStatus.active)
     LaunchedEffect(lifecycle, countdown) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             while (true) {

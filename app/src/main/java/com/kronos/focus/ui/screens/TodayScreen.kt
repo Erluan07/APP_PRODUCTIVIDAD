@@ -190,7 +190,7 @@ fun TodayScreen(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
                     HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
                 }
             }
-            val proved = sl.isBlock && remember(sl.title, now / 10_000L) { proofs.hasProofToday(sl.title) }
+            val proved = remember(sl.title, sl.isBlock, now / 10_000L) { sl.isBlock && proofs.hasProofToday(sl.title) }
             val clash = if (sl.isBlock) CalendarReader.conflicts(events, sl.startMs, sl.endMs).firstOrNull() else null
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.width(48.dp)) {
