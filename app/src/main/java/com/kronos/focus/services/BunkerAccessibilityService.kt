@@ -10,6 +10,7 @@ import android.os.Looper
 import androidx.core.content.ContextCompat
 import com.kronos.focus.data.UsageLimitStore
 import com.kronos.focus.domain.limits.LimitBlock
+import com.kronos.focus.domain.rules.UninstallGuard
 import com.kronos.focus.domain.limits.UsageLimits
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -170,6 +171,15 @@ class BunkerAccessibilityService : AccessibilityService() {
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
                 }
             }
+            lastPackage = pkg
+            return
+        }
+        // Desinstalar Kronos Focus está bloqueado SIEMPRE (con o sin búnker): cierra el diálogo de confirmación al instante.
+        if (pkg != AppRulesConfig.APP_PACKAGE &&
+            UninstallGuard.shouldBlock(event.className?.toString(), event.text.joinToString(" "))
+        ) {
+            showOverlay("Kronos Focus", "\nNo se puede desinstalar.\nEsa decisión ya está tomada.")
+            performGlobalAction(GLOBAL_ACTION_HOME)
             lastPackage = pkg
             return
         }

@@ -14,6 +14,7 @@ import com.kronos.focus.domain.vision.VerdictParser
 import com.kronos.focus.domain.limits.LimitBlock
 import com.kronos.focus.domain.limits.UsageLimits
 import com.kronos.focus.domain.rules.AppRulesConfig
+import com.kronos.focus.domain.rules.UninstallGuard
 import com.kronos.focus.domain.alarm.AlarmEntry
 import com.kronos.focus.domain.alarm.AlarmTimes
 import org.junit.Assert.*
@@ -176,6 +177,19 @@ class RulesTest {
         assertEquals(true, VerdictParser.parse("  SÍ - no hay duda"))            // gana la primera palabra
         assertNull(VerdictParser.parse("Talvez, la foto está borrosa."))
         assertNull(VerdictParser.parse(""))
+    }
+
+    @Test fun uninstallDialogOfKronosIsBlockedButInstallsAreNot() {
+        // Diálogo de desinstalación sin texto legible o que nombra a Kronos: se bloquea
+        assertTrue(UninstallGuard.shouldBlock("com.android.packageinstaller.UninstallerActivity", ""))
+        assertTrue(UninstallGuard.shouldBlock("com.android.packageinstaller.UninstallerActivity", "Kronos Focus ¿Quieres desinstalar esta app?"))
+        assertTrue(UninstallGuard.shouldBlock("com.samsung.OtraClase", "¿Desinstalar Kronos Focus?"))       // respaldo por texto
+        // Desinstalar OTRA app, cuando el texto lo dice, se deja
+        assertFalse(UninstallGuard.shouldBlock("com.android.packageinstaller.UninstallerActivity", "Instagram ¿Quieres desinstalar esta app?"))
+        // Instalar o actualizar (incluye actualizar Kronos) sigue permitido
+        assertFalse(UninstallGuard.shouldBlock("com.android.packageinstaller.PackageInstallerActivity", "Kronos Focus ¿Quieres actualizar esta app?"))
+        assertFalse(UninstallGuard.shouldBlock("com.android.packageinstaller.InstallInstalling", ""))
+        assertFalse(UninstallGuard.shouldBlock(null, ""))
     }
 
     private fun quiet() = List(6) { Epoch(0, false, false) }
