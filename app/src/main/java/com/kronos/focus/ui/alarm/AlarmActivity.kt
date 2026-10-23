@@ -106,6 +106,7 @@ class AlarmActivity : ComponentActivity() {
             }
         }
         if (phase == AlarmPhase.RITUAL) { Ritual(ritualLeft); return }
+        if (phase == AlarmPhase.ROUTINE) { RoutineScreen(); return }
         AlarmBackdrop {
             if (phase == AlarmPhase.CHECK_ACTIVE) {
                 Spacer(Modifier.weight(1f))
@@ -139,6 +140,46 @@ class AlarmActivity : ComponentActivity() {
                     Text("Falta el permiso de cámara: concédelo para escanear.", style = MaterialTheme.typography.bodyLarge, color = Color.White)
                     CtaButton("Dar permiso de cámara", { camLauncher.launch(Manifest.permission.CAMERA) })
                 }
+            }
+        }
+    }
+
+    /** Rutina de la mañana: un paso a la vez, cada uno con foto de evidencia. La música no se puede pausar hasta terminar. */
+    @Composable
+    private fun RoutineScreen() {
+        val routine = remember { com.kronos.focus.data.RoutineStore.get(this@AlarmActivity) }
+        var tick by remember { mutableIntStateOf(0) }
+        var left by remember { mutableLongStateOf(0L) }
+        LaunchedEffect(Unit) {
+            while (true) {
+                tick++
+                left = ((store.routineDeadlineMs - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
+                delay(1000)
+            }
+        }
+        val steps = remember(tick) { routine.steps() }
+        val current = remember(tick) { routine.current() }
+        AlarmBackdrop {
+            Text("Rutina de la mañana", style = MaterialTheme.typography.headlineLarge, color = Color.White)
+            Text(
+                "Tiempo: %d:%02d · la música no se puede pausar ni bajar de la mitad hasta terminar.".format(left / 60, left % 60),
+                style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f),
+            )
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                steps.forEachIndexed { i, s ->
+                    val done = routine.isDone(s)
+                    Text(
+                        (if (done) "✔  " else if (s == current) "➜  " else "○  ") + "${i + 1}. $s",
+                        style = if (s == current) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyLarge,
+                        color = Color.White.copy(alpha = if (done) 0.55f else 1f),
+                    )
+                }
+            }
+            current?.let { step ->
+                Text("Ahora: $step", style = MaterialTheme.typography.titleMedium, color = Color.White)
+                CtaButton("Hacerlo y tomar foto", {
+                    startActivity(com.kronos.focus.ui.ProofActivity.intent(this@AlarmActivity, step, com.kronos.focus.ui.ProofActivity.KIND_ROUTINE))
+                }, Modifier.height(72.dp))
             }
         }
     }

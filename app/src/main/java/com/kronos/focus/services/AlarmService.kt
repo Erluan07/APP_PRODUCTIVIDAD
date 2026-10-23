@@ -45,9 +45,11 @@ class AlarmService : Service() {
             val now = System.currentTimeMillis()
             if (store.phase == AlarmPhase.CHECK_ACTIVE && now > store.checkDeadlineMs) AlarmFlow.escalate(this@AlarmService)
             if (store.phase == AlarmPhase.RITUAL && now > store.ritualDeadlineMs) AlarmFlow.escalateRitual(this@AlarmService)
+            if (store.phase == AlarmPhase.ROUTINE && now > store.routineDeadlineMs) AlarmFlow.escalateRoutine(this@AlarmService)
+            if (store.phase == AlarmPhase.ROUTINE) MusicResume.enforce(this@AlarmService)
             enforceVolume()
             syncSound()
-            if (!AlarmActivity.visible && now - lastLaunch > 2_500L) { lastLaunch = now; launchUi() }
+            if (!AlarmActivity.visible && !com.kronos.focus.ui.ProofActivity.visible && now - lastLaunch > 2_500L) { lastLaunch = now; launchUi() }
             handler.postDelayed(this, 500L)
         }
     }
@@ -113,7 +115,7 @@ class AlarmService : Service() {
     /** Suena salvo durante el silencio temporal ("voy a escanear"); al expirar, reanuda solo. */
     private fun syncSound() {
         val phase = store.phase
-        val muted = phase == AlarmPhase.RITUAL || (phase == AlarmPhase.RINGING && System.currentTimeMillis() < store.muteUntilMs)
+        val muted = phase == AlarmPhase.RITUAL || phase == AlarmPhase.ROUTINE || (phase == AlarmPhase.RINGING && System.currentTimeMillis() < store.muteUntilMs)
         if (muted) pauseSound() else resumeSound()
     }
 

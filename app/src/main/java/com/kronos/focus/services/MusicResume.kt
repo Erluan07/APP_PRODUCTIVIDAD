@@ -6,6 +6,7 @@ import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
+import com.kronos.focus.domain.rules.AppRulesConfig
 
 /**
  * Al apagar la alarma con el QR/NFC, retoma lo que estabas escuchando en Spotify (para levantarte con música).
@@ -15,7 +16,26 @@ import android.view.KeyEvent
 object MusicResume {
     private const val SPOTIFY = "com.spotify.music"
 
+    @Volatile private var guardFrom = 0L
+    @Volatile private var lastNudge = 0L
+
+    /**
+     * Durante la rutina la música no se puede apagar: si la pausan se reanuda y el volumen no baja de la mitad.
+     * Android no deja a una app bloquear los controles de Spotify, así que se corrige a los pocos segundos.
+     * Lo llama AlarmService en cada ciclo mientras la fase es ROUTINE.
+     */
+    fun enforce(ctx: Context) {
+        val now = System.currentTimeMillis()
+        val am = ctx.getSystemService(AudioManager::class.java) ?: return
+        val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val floor = kotlin.math.ceil(max * AppRulesConfig.ROUTINE_MIN_VOLUME).toInt()
+        if (am.getStreamVolume(AudioManager.STREAM_MUSIC) < floor) runCatching { am.setStreamVolume(AudioManager.STREAM_MUSIC, floor, 0) }
+        if (now < guardFrom || now - lastNudge < 3_000L) return
+        if (!am.isMusicActive) { lastNudge = now; sendToSpotify(ctx.applicationContext) }
+    }
+
     fun play(ctx: Context) {
+        guardFrom = System.currentTimeMillis() + 7_000L   // deja tiempo a que arranque la primera vez
         val app = ctx.applicationContext
         val handler = Handler(Looper.getMainLooper())
         // Se espera un instante a que el sonido de la alarma termine de soltar el audio.

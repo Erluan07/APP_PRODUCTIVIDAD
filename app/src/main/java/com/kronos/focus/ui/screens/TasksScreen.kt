@@ -39,6 +39,8 @@ fun TasksScreen(ctx: Context, now: Long, actions: AppActions) {
     ScreenScaffold(fab = { AddFab("Tarea", Icons.Filled.Add) { showNew = true } }) {
         msg?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
 
+        RoutineCard(ctx, now)
+
         SectionTitle("Mis tareas", "Las eliges en el ritual matutino o las sumas a hoy.")
         if (list.isEmpty()) MutedText("Aún no tienes tareas. Toca “Tarea” para crear una.")
         list.forEach { t ->

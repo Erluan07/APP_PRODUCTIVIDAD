@@ -5,6 +5,7 @@ import com.kronos.focus.data.AlarmPhase
 import com.kronos.focus.data.AlarmStateStore
 import com.kronos.focus.domain.rules.AppRulesConfig
 import com.kronos.focus.data.AgendaStore
+import com.kronos.focus.data.RoutineStore
 import com.kronos.focus.data.SleepLogStore
 import com.kronos.focus.data.StatsStore
 import com.kronos.focus.data.BunkerStateStore
@@ -63,13 +64,47 @@ object AlarmFlow {
         if (s.phase != AlarmPhase.RINGING) return
         resetMute(s)
         MusicResume.play(ctx) // retoma Spotify para levantarte con música
+        val routine = RoutineStore.get(ctx)
+        // Rutina armada al irte a dormir (o ya empezada hoy): foto de cada paso, con la música bloqueada.
+        if (routine.steps().isNotEmpty() && (routine.armed || routine.inProgress(AlarmScheduler.epochDay()))) {
+            routine.begin(AlarmScheduler.epochDay())
+            if (!routine.allDone()) {
+                s.routineDeadlineMs = System.currentTimeMillis() + AppRulesConfig.ROUTINE_TIMEOUT_MIN * 60_000L
+                s.phase = AlarmPhase.ROUTINE
+                AlarmService.sync(ctx)
+                return
+            }
+        }
+        afterRoutine(ctx, s)
+    }
+
+    /** Rutina terminada (o no armada): sigue al ritual de agenda o, si ya se hizo hoy, al monitoreo de pasos. */
+    private fun afterRoutine(ctx: Context, s: AlarmStateStore) {
         if (AgendaStore.get(ctx).committedDay() == AlarmScheduler.epochDay()) {
-            toCheckWait(ctx, s)
+            startWatch(ctx, s)
         } else {
             s.ritualDeadlineMs = System.currentTimeMillis() + AppRulesConfig.RITUAL_TIMEOUT_MIN * 60_000L
             s.phase = AlarmPhase.RITUAL
             AlarmService.sync(ctx)
         }
+    }
+
+    /** Se subió la evidencia de un paso; con el último, la música queda libre y sigue el flujo. */
+    fun routineStepDone(ctx: Context) {
+        val s = AlarmStateStore.get(ctx)
+        if (s.phase != AlarmPhase.ROUTINE || !RoutineStore.get(ctx).allDone()) return
+        s.routineDeadlineMs = 0L
+        afterRoutine(ctx, s)
+    }
+
+    /** No terminó la rutina a tiempo: vuelve la alarma completa. */
+    fun escalateRoutine(ctx: Context) {
+        val s = AlarmStateStore.get(ctx)
+        if (s.phase != AlarmPhase.ROUTINE) return
+        resetMute(s)
+        s.ringNote = "No terminaste la rutina a tiempo. Escanea otra vez y retómala donde la dejaste."
+        s.phase = AlarmPhase.RINGING
+        AlarmService.sync(ctx)
     }
 
     /** Misión 2: valida y fija la agenda del día; programa el búnker y el Wake-Up Check. Devuelve un error o null. */
@@ -84,7 +119,7 @@ object AlarmFlow {
         StatsStore.get(ctx).recordCommit(AlarmScheduler.epochDay(), blocks.size + flexNames.distinct().size + musts.size)
         AlarmScheduler.scheduleBlocks(ctx)
         if (BunkerStateStore.get(ctx).isActive()) BunkerWatchdogService.start(ctx)
-        toCheckWait(ctx, s)
+        startWatch(ctx, s)
         return null
     }
 
@@ -94,15 +129,12 @@ object AlarmFlow {
         if (s.phase == AlarmPhase.RITUAL) { resetMute(s); s.phase = AlarmPhase.RINGING }
     }
 
-    private fun toCheckWait(ctx: Context, s: AlarmStateStore) {
-        val delayMin = Random.nextInt(AppRulesConfig.WAKE_CHECK_MIN_DELAY_MIN, AppRulesConfig.WAKE_CHECK_MAX_DELAY_MIN + 1)
-        s.checkAtMs = System.currentTimeMillis() + delayMin * 60_000L
+    /** Ya no hay "¿sigues despierto?": tras la rutina/ritual solo corre el monitoreo de pasos. */
+    private fun startWatch(ctx: Context, s: AlarmStateStore) {
         resetMute(s)
-        s.phase = AlarmPhase.CHECK_WAIT
-        AlarmScheduler.scheduleCheck(ctx, s.checkAtMs)
+        s.phase = AlarmPhase.IDLE
         AlarmService.sync(ctx)
-        // La vigilancia empieza YA (antes solo empezaba tras confirmar y había 7-10 min para volver a la cama sin que nadie mirara).
-        AwakeWatchService.start(ctx, s.checkAtMs + AppRulesConfig.AWAKE_WATCH_MIN * 60_000L)
+        AwakeWatchService.start(ctx, System.currentTimeMillis() + AppRulesConfig.AWAKE_WATCH_MIN * 60_000L)
     }
 
     /** Llega la hora del Wake-Up Check: cuenta atrás de 90 s. */
@@ -125,7 +157,7 @@ object AlarmFlow {
     /** Te quedaste sin usar el teléfono tras decir "estoy despierto": suena otra vez de inmediato. */
     fun relapse(ctx: Context) {
         val s = AlarmStateStore.get(ctx)
-        if (s.phase == AlarmPhase.RINGING || s.phase == AlarmPhase.RITUAL) return
+        if (s.phase == AlarmPhase.RINGING || s.phase == AlarmPhase.RITUAL || s.phase == AlarmPhase.ROUTINE) return
         resetMute(s)
         s.ringNote = "Parece que te volviste a la cama: no caminaste (${AppRulesConfig.AWAKE_MIN_STEPS} pasos cada ${AppRulesConfig.AWAKE_WINDOW_MIN} min). Levántate y vuelve a escanear."
         s.phase = AlarmPhase.RINGING
@@ -144,7 +176,7 @@ object AlarmFlow {
         AlarmScheduler.scheduleDaily(ctx)
         AlarmScheduler.scheduleBlocks(ctx)
         when (s.phase) {
-            AlarmPhase.RINGING, AlarmPhase.RITUAL, AlarmPhase.CHECK_ACTIVE -> AlarmService.sync(ctx)
+            AlarmPhase.RINGING, AlarmPhase.ROUTINE, AlarmPhase.RITUAL, AlarmPhase.CHECK_ACTIVE -> AlarmService.sync(ctx)
             AlarmPhase.CHECK_WAIT -> AlarmScheduler.scheduleCheck(ctx, maxOf(s.checkAtMs, System.currentTimeMillis() + 3_000L))
             AlarmPhase.IDLE -> {}
         }

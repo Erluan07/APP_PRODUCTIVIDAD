@@ -61,6 +61,23 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, "Primero crea una alarma: el Modo Dormir dura hasta que suene.", Toast.LENGTH_LONG).show()
             return
         }
+        val routine = com.kronos.focus.data.RoutineStore.get(this)
+        if (routine.steps().isEmpty()) {
+            beginSleep()
+            return
+        }
+        // Rutina de mañana: la respuesta queda fijada hasta que suene la alarma.
+        android.app.AlertDialog.Builder(this)
+            .setTitle("¿Activar la rutina de mañana?")
+            .setMessage("Al apagar la alarma suena tu música (no se puede pausar) y haces cada paso con foto de evidencia:\n\n" +
+                routine.steps().mapIndexed { i, s -> "${i + 1}. $s" }.joinToString("\n"))
+            .setPositiveButton("Sí, activar") { _, _ -> routine.armed = true; beginSleep() }
+            .setNegativeButton("No") { _, _ -> routine.armed = false; beginSleep() }
+            .setCancelable(false)
+            .show()
+    }
+
+    private fun beginSleep() {
         SleepMode.begin(this)
         Toast.makeText(this, "Modo Dormir activo: las apps quedan bloqueadas hasta tu alarma.", Toast.LENGTH_LONG).show()
         val needMic = AppRulesConfig.SLEEP_USE_MICROPHONE &&

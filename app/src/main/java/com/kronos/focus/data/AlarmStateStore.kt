@@ -3,7 +3,7 @@ package com.kronos.focus.data
 import android.content.Context
 import android.content.SharedPreferences
 
-enum class AlarmPhase { IDLE, RINGING, RITUAL, CHECK_WAIT, CHECK_ACTIVE }
+enum class AlarmPhase { IDLE, RINGING, ROUTINE, RITUAL, CHECK_WAIT, CHECK_ACTIVE }
 
 /** Estado de la alarma en almacenamiento device-protected (sobrevive a reinicios y Direct Boot). */
 class AlarmStateStore private constructor(private val prefs: SharedPreferences) {
@@ -24,6 +24,11 @@ class AlarmStateStore private constructor(private val prefs: SharedPreferences) 
     var ritualDeadlineMs: Long
         get() = prefs.getLong("ritual_deadline", 0L)
         set(v) { prefs.edit().putLong("ritual_deadline", v).apply() }
+
+    /** Límite para terminar la rutina de la mañana. */
+    var routineDeadlineMs: Long
+        get() = prefs.getLong("routine_deadline", 0L)
+        set(v) { prefs.edit().putLong("routine_deadline", v).apply() }
 
     /** Hasta cuándo está silenciada la alarma (botón "voy a escanear"). */
     var muteUntilMs: Long
@@ -50,7 +55,7 @@ class AlarmStateStore private constructor(private val prefs: SharedPreferences) 
         set(v) { prefs.edit().putLong("last_ring_day", v).apply() }
 
     /** La pantalla de alarma debe estar al frente (suena o hay cuenta atrás del Wake-Up Check). */
-    fun uiRequired(): Boolean = phase.let { it == AlarmPhase.RINGING || it == AlarmPhase.RITUAL || it == AlarmPhase.CHECK_ACTIVE }
+    fun uiRequired(): Boolean = phase.let { it == AlarmPhase.RINGING || it == AlarmPhase.ROUTINE || it == AlarmPhase.RITUAL || it == AlarmPhase.CHECK_ACTIVE }
 
     companion object {
         @Volatile private var instance: AlarmStateStore? = null

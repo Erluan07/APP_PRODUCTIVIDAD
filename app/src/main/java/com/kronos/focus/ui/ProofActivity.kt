@@ -33,6 +33,8 @@ import com.kronos.focus.ui.components.Tone
 import com.kronos.focus.ui.theme.KronosTheme
 import com.kronos.focus.data.AgendaStore
 import com.kronos.focus.data.ProofStore
+import com.kronos.focus.data.RoutineStore
+import com.kronos.focus.services.AlarmFlow
 import com.kronos.focus.data.StatsStore
 import com.kronos.focus.services.AlarmScheduler
 import java.io.File
@@ -67,8 +69,8 @@ class ProofActivity : ComponentActivity() {
         camGranted = checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         if (!camGranted) camLauncher.launch(Manifest.permission.CAMERA)
         val verification = VerificationStore.get(this)
-        val verifying = kind == KIND_MUST && VisionModel.isReady(this) &&
-            AgendaStore.get(this).musts().firstOrNull { !it.done && it.name == task }?.verify == true
+        val verifying = VisionModel.isReady(this) && (kind == KIND_ROUTINE ||
+            kind == KIND_MUST && AgendaStore.get(this).musts().firstOrNull { !it.done && it.name == task }?.verify == true)
         setContent {
             KronosTheme {
                 val now by produceState(System.currentTimeMillis()) { while (true) { value = System.currentTimeMillis(); delay(1000) } }
@@ -108,6 +110,9 @@ class ProofActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onResume() { super.onResume(); visible = true }
+    override fun onPause() { visible = false; super.onPause() }
 
     override fun onDestroy() {
         client.close()
@@ -174,6 +179,10 @@ class ProofActivity : ComponentActivity() {
         if (ProofStore.get(this).append(task, kind, file)) {
             if (kind == KIND_FLEX) AgendaStore.get(this).setFlexDone(task, true)
             if (kind == KIND_MUST) AgendaStore.get(this).completeMust(task)
+            if (kind == KIND_ROUTINE) {
+                RoutineStore.get(this).completeStep(task)
+                AlarmFlow.routineStepDone(this)
+            }
             StatsStore.get(this).recordDone(AlarmScheduler.epochDay())
             Toast.makeText(this, if (verified) "Verificada por la IA ✔" else (note ?: "Evidencia guardada ✔"), Toast.LENGTH_LONG).show()
             finish()
@@ -189,6 +198,8 @@ class ProofActivity : ComponentActivity() {
         const val KIND_FLEX = "flex"
         const val KIND_BLOCK = "block"
         const val KIND_MUST = "must"
+        const val KIND_ROUTINE = "routine"
+        @Volatile var visible = false
         fun intent(ctx: Context, task: String, kind: String) =
             Intent(ctx, ProofActivity::class.java).putExtra(EXTRA_TASK, task).putExtra(EXTRA_KIND, kind)
     }
