@@ -17,6 +17,10 @@ jobs:
         with: { gradle-version: "8.10.2" }
       - run: gradle :app:testDebugUnitTest --stacktrace
       - run: gradle :app:assembleRelease --stacktrace
+      - name: Mostrar firma del APK
+        run: |
+          AS=$(ls $ANDROID_HOME/build-tools/*/apksigner | tail -1)
+          $AS verify --print-certs app/build/outputs/apk/release/app-release.apk | grep -i "SHA-256"
       - uses: actions/upload-artifact@v4
         with:
           name: kronos-focus-debug-apk

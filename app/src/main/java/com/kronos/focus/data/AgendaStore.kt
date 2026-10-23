@@ -92,9 +92,6 @@ class AgendaStore private constructor(private val prefs: SharedPreferences) {
 
     fun futureStarts(now: Long): List<Long> = (blocks().map { it.startMs } + musts().filter { !it.done }.map { it.startMs }).filter { it > now }
 
-    /** Solo builds debug (UI). */
-    fun clear() { blocksCache = emptyList(); flexCache = emptyList(); prefs.edit().remove(KEY_BLOCKS).remove(KEY_DAY).remove(KEY_FLEX).apply() }
-
     companion object {
         private const val KEY_BLOCKS = "blocks"
         private const val KEY_DAY = "committed_day"

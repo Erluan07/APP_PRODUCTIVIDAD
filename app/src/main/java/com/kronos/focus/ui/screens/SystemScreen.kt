@@ -109,17 +109,6 @@ fun SystemSection(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
         }
 
         AppCard {
-            SectionTitle("Apariencia", "Solo estética: cámbiala cuando quieras para comparar.")
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val cur = com.kronos.focus.ui.theme.UiDesign.current
-                (if (cur == com.kronos.focus.ui.theme.UiDesign.MIDNIGHT) CtaButton("Medianoche ✓", {}, Modifier.weight(1f))
-                else SoftButton("Medianoche", { com.kronos.focus.ui.theme.UiDesign.set(ctx, com.kronos.focus.ui.theme.UiDesign.MIDNIGHT) }, Modifier.weight(1f)))
-                (if (cur == com.kronos.focus.ui.theme.UiDesign.CLASSIC) CtaButton("Clásico ✓", {}, Modifier.weight(1f))
-                else SoftButton("Clásico", { com.kronos.focus.ui.theme.UiDesign.set(ctx, com.kronos.focus.ui.theme.UiDesign.CLASSIC) }, Modifier.weight(1f)))
-            }
-        }
-
-        AppCard {
             val chosen = com.kronos.focus.data.AllowedAppsStore.get(ctx).chosen().orEmpty()
             SectionTitle("Apps habilitadas en el búnker", "Elegidas la primera vez; ya no se pueden cambiar. El Teléfono siempre está permitido.")
             val pm = ctx.packageManager
@@ -129,24 +118,6 @@ fun SystemSection(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
             MutedText(if (names.isEmpty()) "Ninguna (solo el Teléfono)." else names.joinToString(" · "))
         }
 
-        AppCard {
-            SectionTitle("Diagnóstico", "Últimas apps vistas durante el búnker (✓ permitida, ✗ bloqueada).")
-            val fmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-            val recent = store.recent().take(8)
-            if (recent.isEmpty()) MutedText("Sin actividad todavía.")
-            recent.forEach { (t, ok, pkg) -> MutedText("${fmt.format(Date(t))}  ${if (ok) "✓" else "✗"}  $pkg") }
-        }
-
-        if (BuildConfig.TEST_BUILD) {
-            AppCard {
-                SectionTitle("Herramientas de prueba", "Solo en la versión de prueba (debug).")
-                SoftButton("Hacer sonar la alarma ahora", { AlarmFlow.ring(ctx, test = true) }, Modifier.fillMaxWidth())
-                SoftButton("Sonar en 1 minuto (pantalla apagada)", { AlarmScheduler.scheduleTest(ctx, System.currentTimeMillis() + 60_000L) }, Modifier.fillMaxWidth())
-                SoftButton("Wake-Up Check ahora", { AlarmFlow.startCheck(ctx) }, Modifier.fillMaxWidth())
-                SoftButton("Borrar agenda de hoy", { AgendaStore.get(ctx).clear() }, Modifier.fillMaxWidth())
-                if (owner) SoftButton("Renunciar a Device Owner", { DeviceOwnerHardening.release(ctx) }, Modifier.fillMaxWidth())
-            }
-        }
         Spacer(Modifier.height(4.dp))
     }
 }

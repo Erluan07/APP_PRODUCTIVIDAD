@@ -150,6 +150,8 @@ object AppRulesConfig {
     const val WAKE_CHECK_COUNTDOWN_SEC = 90
     const val SMART_WAKE_WINDOW_MIN = 25
     const val BOOT_TRAP_PENALTY_MIN = 60L
+    /** Si es true, un reinicio con el búnker activo o una alarma pendiente suma BOOT_TRAP_PENALTY_MIN min de búnker. */
+    const val BOOT_PENALTY_ENABLED = false
 
     /**
      * Pantallas del sistema que una app permitida abre al adjuntar/compartir/hacer foto/elegir contacto.

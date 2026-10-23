@@ -144,20 +144,12 @@ class BunkerStateStore private constructor(
         if (isActive()) applyPenalty(minutes) else startSession(minutes)
     }
 
-    // ---- Diagnóstico / registro de intentos ----
+    // ---- Contador de intentos bloqueados (para las estadísticas) ----
     fun recordSeen(pkg: String, allowed: Boolean) {
-        val line = "${System.currentTimeMillis()}|${if (allowed) 1 else 0}|$pkg"
-        val list = (listOf(line) + recent().map { "${it.first}|${if (it.second) 1 else 0}|${it.third}" }).take(15)
-        val e = prefs.edit().putString(KEY_RECENT, list.joinToString("\n"))
-        if (!allowed) { e.putInt(KEY_BLOCKED, blockedCount() + 1); stats.recordBlocked(epochDay(System.currentTimeMillis())) }
-        e.apply()
+        if (allowed) return
+        prefs.edit().putInt(KEY_BLOCKED, blockedCount() + 1).apply()
+        stats.recordBlocked(epochDay(System.currentTimeMillis()))
     }
-
-    fun recent(): List<Triple<Long, Boolean, String>> =
-        (prefs.getString(KEY_RECENT, "") ?: "").lines().mapNotNull {
-            val p = it.split('|', limit = 3)
-            if (p.size == 3) Triple(p[0].toLongOrNull() ?: 0L, p[1] == "1", p[2]) else null
-        }
 
     fun blockedCount(): Int = prefs.getInt(KEY_BLOCKED, 0)
     fun tamperCount(): Int = prefs.getInt(KEY_TAMPER, 0)

@@ -32,12 +32,4 @@ object DeviceOwnerHardening {
         }
         lastApplied = bunkerActive
     }
-
-    /** SOLO builds debug: renuncia a ser Device Owner (necesario para poder desinstalar la app). */
-    fun release(ctx: Context) {
-        if (!isOwner(ctx)) return
-        sync(ctx, false)
-        runCatching { dpm(ctx).clearDeviceOwnerApp(ctx.packageName) }
-        lastApplied = null
-    }
 }

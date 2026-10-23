@@ -13,11 +13,17 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
-        // Compilación de pruebas: conserva la salida de emergencia del búnker y no aplica la penalización de reinicio.
-        // Poner "false" para una versión definitiva.
-        buildConfigField("boolean", "TEST_BUILD", "true")
         // Solo teléfonos de 64 bits: el motor de IA local trae librerías nativas pesadas.
         ndk { abiFilters += "arm64-v8a" }
+    }
+    // Firma FIJA: todas las versiones llevan la misma firma, así cada APK nuevo se instala encima (conserva tus datos).
+    signingConfigs {
+        create("kronos") {
+            storeFile = file("kronos-signing.jks")
+            storePassword = "kronos-focus"
+            keyAlias = "kronos"
+            keyPassword = "kronos-focus"
+        }
     }
     buildTypes {
         release {
@@ -25,7 +31,7 @@ android {
             // Se firma con la clave debug para poder instalarla directamente.
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("kronos")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

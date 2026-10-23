@@ -15,7 +15,6 @@ class AlarmReceiver : BroadcastReceiver() {
         val s = AlarmStateStore.get(context)
         when (intent.action) {
             AlarmScheduler.ACTION_DEADLINE -> AlarmFlow.ring(context, stamp = intent.getStringExtra(AlarmScheduler.EXTRA_STAMP))
-            AlarmScheduler.ACTION_TEST -> AlarmFlow.ring(context, test = true)
             AlarmScheduler.ACTION_CHECK -> AlarmFlow.startCheck(context)
             AlarmScheduler.ACTION_BLOCK -> BunkerWatchdogService.start(context)
             AlarmScheduler.ACTION_SMART ->

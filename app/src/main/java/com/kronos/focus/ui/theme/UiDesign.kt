@@ -17,7 +17,7 @@ object UiDesign {
     private const val KEY = "design"
 
     fun load(ctx: Context) {
-        current = runCatching { ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY, MIDNIGHT) }.getOrDefault(MIDNIGHT)
+        current = MIDNIGHT   // diseño definitivo: Medianoche (ya no hay selector)
     }
 
     fun set(ctx: Context, design: Int) {

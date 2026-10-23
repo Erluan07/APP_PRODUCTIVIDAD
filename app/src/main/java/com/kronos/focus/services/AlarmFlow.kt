@@ -17,10 +17,10 @@ import kotlin.random.Random
 /** Máquina de estados de la alarma. Toda transición pasa por aquí. */
 object AlarmFlow {
 
-    /** Hora límite o Smart Wake-Up: empieza a sonar. [test] no consume la alarma real del día. */
-    fun ring(ctx: Context, test: Boolean = false, smart: Boolean = false, stamp: String? = null) {
+    /** Hora límite o Smart Wake-Up: empieza a sonar. */
+    fun ring(ctx: Context, smart: Boolean = false, stamp: String? = null) {
         val s = AlarmStateStore.get(ctx)
-        if (!test) {
+        run {
             val now = System.currentTimeMillis()
             val occ = AlarmScheduler.nextOccurrence(ctx, now)
             val key = stamp ?: occ?.stamp
@@ -42,9 +42,6 @@ object AlarmFlow {
             resetMute(s)
             s.phase = AlarmPhase.RINGING
             AlarmScheduler.scheduleDaily(ctx) // siguiente día
-        } else {
-            resetMute(s)
-            s.phase = AlarmPhase.RINGING
         }
         AlarmService.sync(ctx)
     }
@@ -65,6 +62,7 @@ object AlarmFlow {
         val s = AlarmStateStore.get(ctx)
         if (s.phase != AlarmPhase.RINGING) return
         resetMute(s)
+        MusicResume.play(ctx) // retoma Spotify para levantarte con música
         if (AgendaStore.get(ctx).committedDay() == AlarmScheduler.epochDay()) {
             toCheckWait(ctx, s)
         } else {

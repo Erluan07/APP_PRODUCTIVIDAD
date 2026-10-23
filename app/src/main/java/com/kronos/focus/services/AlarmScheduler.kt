@@ -19,7 +19,6 @@ object AlarmScheduler {
     const val ACTION_SMART = "com.kronos.focus.ALARM_SMART_START"
     const val ACTION_CHECK = "com.kronos.focus.ALARM_WAKE_CHECK"
     const val ACTION_BLOCK = "com.kronos.focus.BUNKER_BLOCK_START"
-    const val ACTION_TEST = "com.kronos.focus.ALARM_TEST"
     const val EXTRA_STAMP = "stamp"
 
     fun epochDay(): Long = LocalDate.now().toEpochDay()
@@ -50,10 +49,6 @@ object AlarmScheduler {
 
     fun scheduleCheck(ctx: Context, atMs: Long) {
         runCatching { am(ctx).setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMs, pi(ctx, ACTION_CHECK)) }
-    }
-
-    fun scheduleTest(ctx: Context, atMs: Long) {
-        runCatching { am(ctx).setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMs, pi(ctx, ACTION_TEST)) }
     }
 
     /** Programa el arranque del vigilante en cada bloque futuro de la agenda (el bloqueo en sí lo decide la agenda). */
