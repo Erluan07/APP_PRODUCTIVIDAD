@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import com.kronos.focus.data.CalendarReader
 import com.kronos.focus.ui.TimeField
 import com.kronos.focus.ui.components.*
@@ -144,7 +145,7 @@ class AlarmActivity : ComponentActivity() {
         }
     }
 
-    /** Rutina de la mañana: un paso a la vez, cada uno con foto de evidencia. La música no se puede pausar hasta terminar. */
+    /** Rutina de la mañana: tiempo grande, paso actual destacado, avance y reproductor (sin pausa). */
     @Composable
     private fun RoutineScreen() {
         val routine = remember { com.kronos.focus.data.RoutineStore.get(this@AlarmActivity) }
@@ -159,31 +160,94 @@ class AlarmActivity : ComponentActivity() {
         }
         val steps = remember(tick) { routine.steps() }
         val current = remember(tick) { routine.current() }
+        val doneCount = steps.count { routine.isDone(it) }
         AlarmBackdrop {
-            Text("Rutina de la mañana", style = MaterialTheme.typography.headlineLarge, color = Color.White)
+            Text("RUTINA DE LA MAÑANA", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.7f))
             Text(
-                "Tiempo: %d:%02d · la música no se puede pausar ni bajar de la mitad hasta terminar.".format(left / 60, left % 60),
-                style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f),
+                "%d:%02d".format(left / 60, left % 60),
+                style = MaterialTheme.typography.displayLarge.copy(fontSize = 84.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                color = Color.White,
             )
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                steps.forEachIndexed { i, s ->
-                    val done = routine.isDone(s)
-                    Text(
-                        (if (done) "✔  " else if (s == current) "➜  " else "○  ") + "${i + 1}. $s",
-                        style = if (s == current) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyLarge,
-                        color = Color.White.copy(alpha = if (done) 0.55f else 1f),
-                    )
+            LinearProgressIndicator(
+                progress = { if (steps.isEmpty()) 0f else doneCount / steps.size.toFloat() },
+                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                color = Color.White, trackColor = Color.White.copy(alpha = 0.2f),
+            )
+            Text("$doneCount de ${steps.size} pasos", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.8f))
+
+            current?.let { step ->
+                Column(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Color.White.copy(alpha = 0.14f))
+                        .border(1.5.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(20.dp)).padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text("AHORA", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.7f))
+                    Text(step, style = MaterialTheme.typography.headlineMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), color = Color.White)
                 }
             }
-            val playing = remember(tick) { com.kronos.focus.services.MusicResume.isPlaying(this@AlarmActivity) }
-            if (!playing) {
-                OnDarkButton("No suena música: reintentar Spotify") { com.kronos.focus.services.MusicResume.retry(this@AlarmActivity) }
+
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                steps.forEachIndexed { i, st ->
+                    val done = routine.isDone(st)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Box(
+                            Modifier.size(22.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(if (done) Color.White else Color.Transparent)
+                                .border(1.5.dp, Color.White.copy(alpha = if (done) 1f else 0.5f), androidx.compose.foundation.shape.CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) { if (done) Text("✓", color = Palette.Teal950, style = MaterialTheme.typography.labelMedium) }
+                        Text(
+                            "${i + 1}. $st", style = MaterialTheme.typography.bodyLarge,
+                            color = Color.White.copy(alpha = if (done) 0.5f else 0.95f),
+                        )
+                    }
+                }
+                MusicPlayer(tick)
             }
+
             current?.let { step ->
-                Text("Ahora: $step", style = MaterialTheme.typography.titleMedium, color = Color.White)
                 CtaButton("Hacerlo y tomar foto", {
                     startActivity(com.kronos.focus.ui.ProofActivity.intent(this@AlarmActivity, step, com.kronos.focus.ui.ProofActivity.KIND_ROUTINE))
-                }, Modifier.height(72.dp))
+                }, Modifier.height(76.dp))
+            }
+        }
+    }
+
+    /** Reproductor: lo que suena y siguiente/anterior. Pausar no se puede mientras dura la rutina. */
+    @Composable
+    private fun MusicPlayer(tick: Int) {
+        val np = remember(tick) { com.kronos.focus.services.MusicResume.nowPlaying(this@AlarmActivity) }
+        val access = remember(tick / 5) { com.kronos.focus.services.MusicResume.hasSessionAccess(this@AlarmActivity) }
+        Column(
+            Modifier.fillMaxWidth().padding(top = 10.dp).clip(RoundedCornerShape(20.dp)).background(Color.Black.copy(alpha = 0.28f)).padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            if (np == null) {
+                Text("♪ Música", style = MaterialTheme.typography.titleMedium, color = Color.White)
+                Text(
+                    if (access) "Esperando a Spotify…" else "Para ver y controlar la música, activa “Control de la música” en Más → Permisos (antes de dormir).",
+                    style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.8f),
+                )
+                OnDarkButton("Reintentar Spotify") { com.kronos.focus.services.MusicResume.retry(this@AlarmActivity) }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    np.art?.let {
+                        androidx.compose.foundation.Image(
+                            it.asImageBitmap(), contentDescription = null,
+                            modifier = Modifier.size(64.dp).clip(RoundedCornerShape(10.dp)),
+                        )
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text(np.title, style = MaterialTheme.typography.titleMedium, color = Color.White, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        Text(np.artist, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.8f), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(Modifier.weight(1f)) { OnDarkButton("⏮ Anterior") { com.kronos.focus.services.MusicResume.previous(this@AlarmActivity) } }
+                    Box(Modifier.weight(1f)) { OnDarkButton("Siguiente ⏭") { com.kronos.focus.services.MusicResume.next(this@AlarmActivity) } }
+                }
+                if (!np.playing) OnDarkButton("Sigue sin sonar: reintentar") { com.kronos.focus.services.MusicResume.retry(this@AlarmActivity) }
+                Text("La música no se puede pausar hasta terminar la rutina.", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.6f))
             }
         }
     }

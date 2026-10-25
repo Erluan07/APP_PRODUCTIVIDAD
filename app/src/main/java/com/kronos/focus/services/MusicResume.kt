@@ -67,6 +67,29 @@ object MusicResume {
         if (now - lastLaunch > 30_000L) { launchSpotify(ctx.applicationContext) }
     }
 
+    /** Lo que suena ahora (título, artista, carátula) leído de la sesión de medios; null sin acceso o sin nada activo. */
+    data class NowPlaying(val title: String, val artist: String, val art: android.graphics.Bitmap?, val playing: Boolean)
+
+    private fun controller(ctx: Context): android.media.session.MediaController? = runCatching {
+        val sessions = ctx.getSystemService(MediaSessionManager::class.java)
+            .getActiveSessions(ComponentName(ctx, MediaListener::class.java))
+        sessions.firstOrNull { it.packageName == SPOTIFY } ?: sessions.firstOrNull()
+    }.getOrNull()
+
+    fun nowPlaying(ctx: Context): NowPlaying? {
+        val c = controller(ctx) ?: return null
+        val m = c.metadata ?: return null
+        val title = m.getString(android.media.MediaMetadata.METADATA_KEY_TITLE) ?: m.getString(android.media.MediaMetadata.METADATA_KEY_DISPLAY_TITLE) ?: return null
+        val artist = m.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST) ?: m.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM_ARTIST) ?: ""
+        val art = m.getBitmap(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART) ?: m.getBitmap(android.media.MediaMetadata.METADATA_KEY_ART)
+            ?: m.getBitmap(android.media.MediaMetadata.METADATA_KEY_DISPLAY_ICON)
+        return NowPlaying(title, artist, art, c.playbackState?.state == android.media.session.PlaybackState.STATE_PLAYING)
+    }
+
+    /** Siguiente / anterior. No hay función de pausa a propósito. */
+    fun next(ctx: Context) { runCatching { controller(ctx)?.transportControls?.skipToNext() } }
+    fun previous(ctx: Context) { runCatching { controller(ctx)?.transportControls?.skipToPrevious() } }
+
     private fun nudge(ctx: Context) {
         sendViaSession(ctx)
         sendToSpotify(ctx)
