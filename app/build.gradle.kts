@@ -11,7 +11,8 @@ android {
         applicationId = "com.kronos.focus"
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
+        // Crece con cada build de CI: Android solo instala encima una versión con el mismo o mayor versionCode.
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
         versionName = "0.1.0"
         // Solo teléfonos de 64 bits: el motor de IA local trae librerías nativas pesadas.
         ndk { abiFilters += "arm64-v8a" }

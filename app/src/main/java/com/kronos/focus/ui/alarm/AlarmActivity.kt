@@ -175,6 +175,10 @@ class AlarmActivity : ComponentActivity() {
                     )
                 }
             }
+            val playing = remember(tick) { com.kronos.focus.services.MusicResume.isPlaying(this@AlarmActivity) }
+            if (!playing) {
+                OnDarkButton("No suena música: reintentar Spotify") { com.kronos.focus.services.MusicResume.retry(this@AlarmActivity) }
+            }
             current?.let { step ->
                 Text("Ahora: $step", style = MaterialTheme.typography.titleMedium, color = Color.White)
                 CtaButton("Hacerlo y tomar foto", {

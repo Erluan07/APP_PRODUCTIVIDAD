@@ -140,6 +140,12 @@
                 android:value="Vigila que el usuario siga despierto tras apagar la alarma" />
         </service>
 
+        <service android:name=".services.MediaListener" android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter><action android:name="android.service.notification.NotificationListenerService" /></intent-filter>
+        </service>
+
         <!-- Fase 2: alarma -->
         <service android:name=".services.AlarmService" android:exported="false"
             android:directBootAware="true" android:foregroundServiceType="mediaPlayback" />

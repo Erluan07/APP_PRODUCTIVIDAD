@@ -39,7 +39,6 @@ import com.kronos.focus.data.StatsStore
 import com.kronos.focus.services.AlarmScheduler
 import java.io.File
 import androidx.lifecycle.lifecycleScope
-import com.kronos.focus.data.VerificationStore
 import com.kronos.focus.domain.rules.AppRulesConfig
 import com.kronos.focus.ui.components.SoftButton
 import com.kronos.focus.vision.VisionClient
@@ -68,14 +67,11 @@ class ProofActivity : ComponentActivity() {
         val kind = intent.getStringExtra(EXTRA_KIND).orEmpty()
         camGranted = checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         if (!camGranted) camLauncher.launch(Manifest.permission.CAMERA)
-        val verification = VerificationStore.get(this)
         val verifying = VisionModel.isReady(this) && (kind == KIND_ROUTINE ||
             kind == KIND_MUST && AgendaStore.get(this).musts().firstOrNull { !it.done && it.name == task }?.verify == true)
         setContent {
             KronosTheme {
                 val now by produceState(System.currentTimeMillis()) { while (true) { value = System.currentTimeMillis(); delay(1000) } }
-                val lockedUntil = verification.lockedUntil(task)
-                val locked = verifying && now < lockedUntil
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     Column(
                         Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(16.dp),
@@ -84,14 +80,10 @@ class ProofActivity : ComponentActivity() {
                         Text("Foto de evidencia", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onBackground)
                         StatusPill(task, Tone.INFO)
                         MutedText(
-                            if (verifying) "Toma una foto en vivo que muestre que haces la tarea. La IA del teléfono la revisa (${AppRulesConfig.VERIFY_MAX_ATTEMPTS} intentos)."
+                            if (verifying) "Toma una foto en vivo que muestre que haces la tarea. La IA del teléfono la revisa; puedes intentar las veces que necesites."
                             else "Toma una foto en vivo que muestre que la hiciste. No se puede elegir de la galería."
                         )
                         info?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onBackground) }
-                        if (locked) {
-                            val sec = (lockedUntil - now) / 1000
-                            StatusPill("Sin más intentos. Vuelve a intentarlo en %d:%02d".format(sec / 60, sec % 60), Tone.WARN)
-                        }
                         if (camGranted) {
                             key(useFront) { Box(Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(16.dp))) { Preview(Modifier.fillMaxSize()) } }
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -99,7 +91,7 @@ class ProofActivity : ComponentActivity() {
                             }
                             CtaButton(
                                 if (busy) "Analizando…" else "Tomar foto", { capture(task, kind, verifying) },
-                                Modifier.height(64.dp), enabled = !busy && !locked,
+                                Modifier.height(64.dp), enabled = !busy,
                             )
                         } else {
                             MutedText("Falta el permiso de cámara.")
@@ -153,15 +145,11 @@ class ProofActivity : ComponentActivity() {
                     lifecycleScope.launch {
                         val r = client.verify(file, task)
                         busy = false
-                        val store = VerificationStore.get(this@ProofActivity)
                         when (r.verdict) {
-                            1 -> { store.clear(task); accept(task, kind, file, verified = true, note = r.reason) }
+                            1 -> accept(task, kind, file, verified = true, note = r.reason)
                             0 -> {
                                 file.delete()
-                                val n = store.recordReject(task, System.currentTimeMillis())
-                                info = "La IA no ve la tarea: ${r.reason}\n" +
-                                    if (n >= AppRulesConfig.VERIFY_MAX_ATTEMPTS) "Sin más intentos: espera ${AppRulesConfig.VERIFY_LOCK_MIN} min y vuelve a probar."
-                                    else "Intento $n de ${AppRulesConfig.VERIFY_MAX_ATTEMPTS}. Toma otra foto que muestre mejor la tarea."
+                                info = "La IA no ve la tarea: ${r.reason}\nToma otra foto que muestre mejor la tarea."
                             }
                             // Fallo técnico del analizador: no se castiga al usuario; la evidencia se guarda marcada como "sin verificar".
                             else -> accept(task, kind, file, verified = false, note = "Sin verificar por la IA (${r.reason})")

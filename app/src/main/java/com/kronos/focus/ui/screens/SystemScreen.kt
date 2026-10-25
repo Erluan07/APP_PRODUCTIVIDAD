@@ -63,6 +63,10 @@ fun SystemSection(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
                 "Sensor de pasos", ctx.checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED,
                 "Para comprobar que caminas después de despertar (sin él es menos fiable)", "Permitir",
             ) { actions.requestSteps() }
+            CheckRow(
+                "Control de la música (Spotify)", com.kronos.focus.services.MusicResume.hasSessionAccess(ctx),
+                "Para que suene Spotify al apagar la alarma. Kronos no lee tus notificaciones", "Activar",
+            ) { ctx.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
             CheckRow("Cámara", camOk, "Para escanear el QR y las fotos de evidencia", "Permitir") { actions.requestCamera() }
             CheckRow("Calendario", com.kronos.focus.data.CalendarReader.hasPermission(ctx), "Para ver tus reuniones junto a tus tareas", "Permitir") { actions.requestCalendar() }
             CheckRow("Alarma en pantalla completa", fsOk, "Para que la alarma aparezca con la pantalla bloqueada", "Permitir") {
