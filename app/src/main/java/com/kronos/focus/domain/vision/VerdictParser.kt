@@ -25,7 +25,10 @@ object VerdictParser {
 
     /** Prompt para el modelo. Respuesta pedida: "SI" o "NO" y un motivo corto. */
     fun prompt(task: String): String =
-        "Eres un verificador estricto de tareas. La tarea de la persona es: \"$task\". " +
-            "Mira la foto. ¿Se ve claramente a la persona haciendo esa tarea ahora mismo, o en el lugar donde se hace? " +
+        "Verificas fotos de evidencia de una tarea personal. La tarea es: \"$task\". " +
+            "Responde SI si es razonable que la foto muestre a la persona haciendo esa tarea o recién hecha, aunque no se vea todo " +
+            "(por ejemplo, si la tarea es tomar o beber algo, basta ver un vaso, botella o recipiente en la mano o en la boca, " +
+            "aunque el líquido sea transparente o incoloro; si es cepillarse, basta el cepillo o la espuma). " +
+            "Responde NO solo si la foto claramente no tiene relación con la tarea (pared, techo, cama, pantalla, nada que ver). " +
             "Responde SOLO con la palabra SI o NO al principio, y después una frase corta con el motivo."
 }
