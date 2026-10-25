@@ -174,7 +174,15 @@ object AppRulesConfig {
         "com.samsung.android.app.smartcapture", "com.sec.android.app.myfiles", "com.samsung.android.provider.filterprovider",
         "com.samsung.android.mdx", "com.samsung.android.scs", "com.samsung.android.bixby.service",
         "com.android.intentresolver",
+        // Aviso de huella / biometría (Samsung lo muestra como "Configuración"): lo abre Bancolombia al pedir la huella.
+        "com.samsung.android.biometrics.app.setting", "com.samsung.android.authfw", "com.samsung.android.bio.face.service",
     )
+
+    /** Pantallas de huella/rostro de otros fabricantes: mismos permisos que [APP_HELPERS] (solo viniendo de una app permitida). */
+    private val HELPER_KEYWORDS = listOf("biometric", "fingerprint", "authfw")
+
+    fun isAppHelper(pkg: String): Boolean =
+        pkg in APP_HELPERS || (!pkg.contains(".settings") && HELPER_KEYWORDS.any { pkg.contains(it) })
 
     /** Nombres de paquete que jamás deben bloquearse (llamadas de emergencia). */
     /** ¿Es una app de usuario habilitada? [userApps] = la lista elegida y bloqueada; null = aún sin elegir (valores por defecto). */

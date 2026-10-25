@@ -190,7 +190,7 @@ class BunkerAccessibilityService : AccessibilityService() {
         val userApps = allowedApps.chosen()
         val isUserApp = !strict && AppRulesConfig.isUserApp(pkg, userApps)
         if (isUserApp) fromAllowedApp = true
-        val helper = !strict && fromAllowedApp && pkg in AppRulesConfig.APP_HELPERS
+        val helper = !strict && fromAllowedApp && AppRulesConfig.isAppHelper(pkg)
         if (helper || AppRulesConfig.isAllowed(pkg, launchers, imes, strict = strict, userApps = userApps)) {
             if (!helper && !isUserApp && pkg !in AppRulesConfig.SYSTEM_ALLOWED && pkg !in imes) fromAllowedApp = false
             if (pkg != lastPackage) state.recordSeen(pkg, true)
