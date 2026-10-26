@@ -90,6 +90,23 @@ class AlarmActivity : ComponentActivity() {
 
     @Composable
     private fun Content() {
+        Box(Modifier.fillMaxSize()) {
+            ContentInner()
+            var tick by remember { mutableIntStateOf(0) }
+            LaunchedEffect(Unit) { while (true) { tick++; delay(1000) } }
+            if (remember(tick) { com.kronos.focus.services.TestMode.active(this@AlarmActivity) }) {
+                Box(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(12.dp)) {
+                    Button(
+                        onClick = { com.kronos.focus.services.TestMode.exitAll(this@AlarmActivity) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB3261E), contentColor = Color.White),
+                    ) { Text("Salir (prueba)") }
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun ContentInner() {
         var phase by remember { mutableStateOf(store.phase) }
         var remaining by remember { mutableLongStateOf(0L) }
         var muteLeft by remember { mutableLongStateOf(0L) }

@@ -164,6 +164,7 @@ class BunkerAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
+        TestMode.checkExpiry(this)
         // Mientras suena la alarma (o hay Wake-Up Check) nada puede estar delante de la pantalla de alarma.
         if (alarm.uiRequired()) {
             hideOverlay()   // el aviso de "Modo dormir/búnker" jamás debe tapar la alarma ni la rutina

@@ -86,6 +86,12 @@ class AgendaStore private constructor(private val prefs: SharedPreferences) {
     /** Solo agrega (durante el día). No existe forma de quitar o editar bloques confirmados. */
     fun addBlock(b: AgendaBlock) = writeBlocks(blocks() + b)
 
+    /** SOLO para salir del Modo prueba: borra los bloques y tareas de hoy (las obligatorias pendientes no se tocan). */
+    fun resetDayForTest() {
+        writeBlocks(emptyList()); saveFlex(emptyList())
+        prefs.edit().putLong(KEY_DAY, -1L).apply()
+    }
+
     fun addFlex(name: String) = saveFlex(flex() + FlexTask(name))
 
     fun activeBlockAt(now: Long): AgendaBlock? = blocks().firstOrNull { now >= it.startMs && now < it.endMs }

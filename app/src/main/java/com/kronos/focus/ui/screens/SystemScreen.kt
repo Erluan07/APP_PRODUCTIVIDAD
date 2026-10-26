@@ -122,6 +122,23 @@ fun SystemSection(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
             MutedText(if (names.isEmpty()) "Ninguna (solo el Teléfono)." else names.joinToString(" · "))
         }
 
+        AppCard {
+            val testOn = com.kronos.focus.services.TestMode.active(ctx)
+            var tick by remember { mutableIntStateOf(0) }
+            SectionTitle("Modo prueba", "Para probar la alarma, la rutina y el Modo Dormir con salida rápida. Dura ${com.kronos.focus.services.TestMode.DURATION_MIN} min.")
+            if (testOn) {
+                val left = ((com.kronos.focus.services.TestMode.until(ctx) - now) / 1000).coerceAtLeast(0)
+                StatusPill("Activo · quedan %d:%02d".format(left / 60, left % 60), Tone.WARN)
+                CtaButton("Probar alarma y rutina ahora", { com.kronos.focus.services.AlarmFlow.ringNow(ctx); tick++ }, Modifier.fillMaxWidth())
+                SoftButton("Salir y limpiar todo", { com.kronos.focus.services.TestMode.exitAll(ctx); tick++ }, Modifier.fillMaxWidth())
+                MutedText("Salidas: este botón, “Salir” en la pantalla de alarma/rutina, o la notificación fija. Al salir se borran los bloques y tareas de hoy y se apagan búnker, dormir y monitoreo.")
+            } else {
+                val can = com.kronos.focus.services.TestMode.canStart(ctx)
+                CtaButton("Activar Modo prueba", { com.kronos.focus.services.TestMode.start(ctx); tick++ }, Modifier.fillMaxWidth(), enabled = can)
+                if (!can) MutedText("Solo se activa con todo en reposo: sin búnker, Modo Dormir ni alarma activos.")
+            }
+        }
+
         Spacer(Modifier.height(4.dp))
     }
 }

@@ -64,6 +64,11 @@ class RoutineStore private constructor(private val prefs: SharedPreferences) {
     /** Hoy ya empezó la rutina y faltan pasos (p. ej. la alarma volvió a sonar a medias). */
     fun inProgress(epochDay: Long) = day == epochDay && !allDone()
 
+    /** SOLO para salir del Modo prueba. */
+    fun reset() {
+        prefs.edit().putBoolean("armed", false).putLong("day", -1L).putString("done", "[]").apply()
+    }
+
     fun isDone(step: String) = step in doneList()
 
     /** Paso actual: el primero de la lista sin evidencia. */

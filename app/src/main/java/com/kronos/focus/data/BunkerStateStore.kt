@@ -46,6 +46,13 @@ class BunkerStateStore private constructor(
         prefs.edit().putLong(KEY_SLEEP_START, 0L).putLong(KEY_SLEEP_END, 0L).apply()
     }
 
+    /** SOLO para salir del Modo prueba (ver TestMode): termina el búnker manual, el Pomodoro y el Modo Dormir. */
+    fun forceEnd() {
+        endsAtMs = 0L; sessionStartMs = 0L; pomoStartMs = 0L; sleepStartMs = 0L; sleepEndMs = 0L
+        prefs.edit().putLong(KEY_ENDS_AT, 0L).putLong(KEY_SESSION_START, 0L).putLong(KEY_POMO_START, 0L)
+            .putLong(KEY_SLEEP_START, 0L).putLong(KEY_SLEEP_END, 0L).apply()
+    }
+
     /** Activo si hay un búnker manual, un bloque de la agenda (salvo en la pausa fija) o el Modo Dormir. */
     fun isActive(now: Long = System.currentTimeMillis()): Boolean =
         ((now < endsAtMs || agenda.activeBlockAt(now) != null) && !inFreeWindow(now)) || isSleepMode(now) || mustActive(now)

@@ -41,6 +41,7 @@ class AlarmService : Service() {
 
     private val tick = object : Runnable {
         override fun run() {
+            TestMode.checkExpiry(this@AlarmService)
             if (!store.uiRequired()) { shutdown(); return }
             val now = System.currentTimeMillis()
             if (store.phase == AlarmPhase.CHECK_ACTIVE && now > store.checkDeadlineMs) AlarmFlow.escalate(this@AlarmService)

@@ -47,6 +47,19 @@ object AlarmFlow {
         AlarmService.sync(ctx)
     }
 
+    /** Solo Modo prueba: suena la alarma ahora, con la rutina armada, sin consumir la alarma real del día. */
+    fun ringNow(ctx: Context) {
+        if (!TestMode.active(ctx)) return
+        val s = AlarmStateStore.get(ctx)
+        if (s.phase != AlarmPhase.IDLE) return
+        val routine = RoutineStore.get(ctx)
+        routine.armed = routine.steps().isNotEmpty()
+        s.ringNote = "Prueba de la alarma."
+        resetMute(s)
+        s.phase = AlarmPhase.RINGING
+        AlarmService.sync(ctx)
+    }
+
     /** "Ya desperté, voy a escanear": silencia [AppRulesConfig.MUTE_SECONDS] s; si no escanea, vuelve el ruido. */
     fun muteForScan(ctx: Context): Boolean {
         val s = AlarmStateStore.get(ctx)

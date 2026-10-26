@@ -154,6 +154,7 @@
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Seguimiento de sueño con acelerómetro y volumen para despertar en sueño ligero" />
         </service>
+        <receiver android:name=".receivers.TestExitReceiver" android:exported="false" />
         <receiver android:name=".receivers.AlarmReceiver" android:exported="false"
             android:directBootAware="true" />
         <activity android:name=".ui.alarm.AlarmActivity" android:exported="false"
