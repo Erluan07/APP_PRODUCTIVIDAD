@@ -264,7 +264,7 @@ class AlarmActivity : ComponentActivity() {
                     Box(Modifier.weight(1f)) { OnDarkButton("Siguiente ⏭") { com.kronos.focus.services.MusicResume.next(this@AlarmActivity) } }
                 }
                 if (!np.playing) OnDarkButton("Sigue sin sonar: reintentar") { com.kronos.focus.services.MusicResume.retry(this@AlarmActivity) }
-                Text("La música no se puede pausar hasta terminar la rutina.", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.6f))
+                Text("La música no se puede pausar y el volumen queda al máximo hasta terminar la rutina.", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.6f))
             }
         }
     }

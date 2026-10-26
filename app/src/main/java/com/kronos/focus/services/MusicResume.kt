@@ -35,8 +35,16 @@ object MusicResume {
             ?.contains(ctx.packageName) == true
 
     /** Arranca la música tras el escaneo y reintenta solo hasta que suene. */
+    /** Sube el volumen de la música al nivel de la rutina (el máximo) al instante. */
+    private fun volumeUp(ctx: Context) {
+        val am = ctx.getSystemService(AudioManager::class.java) ?: return
+        val floor = kotlin.math.ceil(am.getStreamMaxVolume(AudioManager.STREAM_MUSIC) * AppRulesConfig.ROUTINE_MIN_VOLUME).toInt()
+        if (am.getStreamVolume(AudioManager.STREAM_MUSIC) < floor) runCatching { am.setStreamVolume(AudioManager.STREAM_MUSIC, floor, 0) }
+    }
+
     fun play(ctx: Context) {
         val app = ctx.applicationContext
+        volumeUp(app)   // el volumen sube de una, antes de que empiece a sonar
         guardFrom = System.currentTimeMillis() + 12_000L   // deja tiempo a que arranque la primera vez
         handler.postDelayed({ nudge(app) }, 1_200L)
         handler.postDelayed({ if (!isPlaying(app)) nudge(app) }, 4_000L)
@@ -46,21 +54,20 @@ object MusicResume {
     /** Botón "Reintentar música" de la pantalla de rutina. */
     fun retry(ctx: Context) {
         val app = ctx.applicationContext
+        volumeUp(app)
         nudge(app)
         handler.postDelayed({ if (!isPlaying(app)) { launchSpotify(app); handler.postDelayed({ nudge(app) }, 3_000L) } }, 2_500L)
     }
 
     /**
-     * Durante la rutina la música no se puede apagar: si la pausan se reanuda y el volumen no baja de la mitad.
+     * Durante la rutina la música no se puede apagar: si la pausan se reanuda y el volumen queda en el máximo.
      * Android no deja a una app bloquear los controles de Spotify, así que se corrige a los pocos segundos.
      * Lo llama AlarmService en cada ciclo mientras la fase es ROUTINE.
      */
     fun enforce(ctx: Context) {
         val now = System.currentTimeMillis()
         val am = ctx.getSystemService(AudioManager::class.java) ?: return
-        val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        val floor = kotlin.math.ceil(max * AppRulesConfig.ROUTINE_MIN_VOLUME).toInt()
-        if (am.getStreamVolume(AudioManager.STREAM_MUSIC) < floor) runCatching { am.setStreamVolume(AudioManager.STREAM_MUSIC, floor, 0) }
+        volumeUp(ctx)
         if (now < guardFrom || now - lastNudge < 3_000L || am.isMusicActive) return
         lastNudge = now
         nudge(ctx.applicationContext)
