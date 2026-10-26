@@ -55,6 +55,7 @@ class BunkerAccessibilityService : AccessibilityService() {
         override fun onReceive(context: Context, intent: Intent) {
             val now = System.currentTimeMillis()
             if (intent.action == Intent.ACTION_SCREEN_OFF) {
+                hideOverlay()
                 accountUsage(now); trackedPkg?.let { lastLeft[it] = now }; trackedSince = 0L; handler.removeCallbacks(tick)
             } else if (intent.action == Intent.ACTION_USER_PRESENT) {
                 val p = trackedPkg
@@ -165,6 +166,7 @@ class BunkerAccessibilityService : AccessibilityService() {
         val pkg = event.packageName?.toString() ?: return
         // Mientras suena la alarma (o hay Wake-Up Check) nada puede estar delante de la pantalla de alarma.
         if (alarm.uiRequired()) {
+            hideOverlay()   // el aviso de "Modo dormir/búnker" jamás debe tapar la alarma ni la rutina
             if (pkg != AppRulesConfig.APP_PACKAGE && pkg !in AppRulesConfig.SYSTEM_ALLOWED && pkg !in imes) {
                 runCatching {
                     startActivity(Intent(this, com.kronos.focus.ui.alarm.AlarmActivity::class.java)
@@ -186,6 +188,8 @@ class BunkerAccessibilityService : AccessibilityService() {
         if (handleLimits(pkg)) { lastPackage = pkg; return }
         if (!state.isActive()) { hideOverlay(); lastPackage = pkg; return }
 
+        // Con la pantalla apagada o en reposo (reloj/AOD de Samsung) no hay nada que bloquear: pulsar INICIO ahí encendía la pantalla en bucle.
+        if (!getSystemService(android.os.PowerManager::class.java).isInteractive) { hideOverlay(); lastPackage = pkg; return }
         val strict = state.isSleepMode()
         val userApps = allowedApps.chosen()
         val isUserApp = !strict && AppRulesConfig.isUserApp(pkg, userApps)
@@ -204,7 +208,12 @@ class BunkerAccessibilityService : AccessibilityService() {
         lastPackage = pkg
     }
 
+    private var lastBlockMs = 0L
+
     private fun block(@Suppress("UNUSED_PARAMETER") blockedPackage: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastBlockMs < 1_500L) return
+        lastBlockMs = now
         showOverlay()
         performGlobalAction(GLOBAL_ACTION_HOME)
     }
@@ -238,10 +247,15 @@ class BunkerAccessibilityService : AccessibilityService() {
         )
         windowManager.addView(view, params)
         overlay = view
+        handler.removeCallbacks(autoHide)
+        handler.postDelayed(autoHide, 4_000L)   // si no vuelve a haber eventos, no se queda tapando la pantalla
         // El overlay se retira solo al volver a una app permitida (ver onAccessibilityEvent).
     }
 
+    private val autoHide = Runnable { hideOverlay() }
+
     private fun hideOverlay() {
+        handler.removeCallbacks(autoHide)
         overlay?.let { runCatching { windowManager.removeView(it) } }
         overlay = null
     }
