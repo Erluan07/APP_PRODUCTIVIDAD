@@ -1,0 +1,11 @@
+<resources>
+    <!-- Ventana base con los colores del sistema de diseño (claro/oscuro automático). Sin barra con el nombre de la app. -->
+    <style name="Theme.Kronos" parent="android:Theme.DeviceDefault.DayNight">
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">@color/kronos_background</item>
+        <item name="android:colorPrimary">@color/kronos_primary</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
+</resources>
