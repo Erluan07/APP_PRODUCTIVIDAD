@@ -200,6 +200,10 @@ class BunkerAccessibilityService : AccessibilityService() {
             if (!helper && !isUserApp && pkg !in AppRulesConfig.SYSTEM_ALLOWED && pkg !in imes) fromAllowedApp = false
             if (pkg != lastPackage) state.recordSeen(pkg, true)
             hideOverlay()
+        } else if (!isBlockable(pkg)) {
+            // Ventana del sistema sin icono de app (borde Edge, avisos de gestos, teclado flotante…): no es una distracción
+            // y bloquearla sacaba al usuario de Kronos (p. ej. al abrir la pantalla grande con las barras ocultas).
+            lastPackage = pkg; return
         } else {
             // Los bloqueados se re-bloquean siempre (sin deduplicar) por si el HOME falló.
             state.recordSeen(pkg, false)
@@ -207,6 +211,14 @@ class BunkerAccessibilityService : AccessibilityService() {
             block(pkg)
         }
         lastPackage = pkg
+    }
+
+    private val launchable = HashMap<String, Boolean>()
+
+    /** Solo se bloquea lo que puedes abrir como app (tiene icono) o lo que está en las listas de bloqueo explícito. */
+    private fun isBlockable(pkg: String): Boolean {
+        if (pkg in AppRulesConfig.ALWAYS_BLOCKED_IN_BUNKER || AppRulesConfig.BLOCKED_PREFIXES.any { pkg.startsWith(it) } || pkg.contains(".settings")) return true
+        return launchable.getOrPut(pkg) { packageManager.getLaunchIntentForPackage(pkg) != null }
     }
 
     private var lastBlockMs = 0L
