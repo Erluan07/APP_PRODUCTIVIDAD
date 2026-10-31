@@ -126,6 +126,9 @@ fun SystemSection(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
             val testOn = com.kronos.focus.services.TestMode.active(ctx)
             val refresh = com.kronos.focus.ui.LocalRefresh.current
             SectionTitle("Modo prueba", "Para probar la alarma, la rutina y el Modo Dormir con salida rápida. Dura ${com.kronos.focus.services.TestMode.DURATION_MIN} min.")
+            BunkerStateStore.get(ctx).lastBlocked()?.let { (p, at) ->
+                MutedText("Último bloqueado: $p · hace ${((now - at) / 1000).coerceAtLeast(0)} s")
+            }
             if (testOn) {
                 val left = ((com.kronos.focus.services.TestMode.until(ctx) - now) / 1000).coerceAtLeast(0)
                 StatusPill("Activo · quedan %d:%02d".format(left / 60, left % 60), Tone.WARN)

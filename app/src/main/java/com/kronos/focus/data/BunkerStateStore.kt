@@ -154,9 +154,14 @@ class BunkerStateStore private constructor(
     // ---- Contador de intentos bloqueados (para las estadísticas) ----
     fun recordSeen(pkg: String, allowed: Boolean) {
         if (allowed) return
-        prefs.edit().putInt(KEY_BLOCKED, blockedCount() + 1).apply()
+        prefs.edit().putInt(KEY_BLOCKED, blockedCount() + 1).putString("last_blocked", pkg)
+            .putLong("last_blocked_at", System.currentTimeMillis()).apply()
         stats.recordBlocked(epochDay(System.currentTimeMillis()))
     }
+
+    /** Último paquete que el bloqueo sacó de pantalla y cuándo (para entender bloqueos inesperados). */
+    fun lastBlocked(): Pair<String, Long>? =
+        prefs.getString("last_blocked", null)?.let { it to prefs.getLong("last_blocked_at", 0L) }
 
     fun blockedCount(): Int = prefs.getInt(KEY_BLOCKED, 0)
     fun tamperCount(): Int = prefs.getInt(KEY_TAMPER, 0)
