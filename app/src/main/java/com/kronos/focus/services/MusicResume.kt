@@ -27,6 +27,14 @@ object MusicResume {
     @Volatile private var lastNudge = 0L
     @Volatile private var lastLaunch = 0L
 
+    /** Salidas de audio Bluetooth conectadas (audífonos, parlantes, audífonos para sordera). No requiere permisos. */
+    fun bluetoothAudioConnected(ctx: Context): Boolean {
+        val am = ctx.getSystemService(AudioManager::class.java) ?: return false
+        // 7 SCO · 8 A2DP · 23 audífono auditivo · 26 BLE headset · 27 BLE speaker · 30 BLE broadcast
+        val bt = setOf(7, 8, 23, 26, 27, 30)
+        return runCatching { am.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any { it.type in bt } }.getOrDefault(false)
+    }
+
     fun isPlaying(ctx: Context) = ctx.getSystemService(AudioManager::class.java)?.isMusicActive == true
 
     /** ¿Está activado el acceso a notificaciones de Kronos (permite controlar Spotify de forma fiable)? */

@@ -132,6 +132,10 @@ class ProofActivity : ComponentActivity() {
     }
 
     private fun capture(task: String, kind: String, verifying: Boolean) {
+        if (kind == KIND_ROUTINE && com.kronos.focus.services.MusicResume.bluetoothAudioConnected(this)) {
+            info = "Desconecta los audífonos o parlantes Bluetooth: durante la rutina la música debe sonar por el teléfono."
+            return
+        }
         val cap = imageCapture ?: return
         val file = File(ProofStore.proofDir(this), "${System.currentTimeMillis()}.jpg")
         cap.takePicture(

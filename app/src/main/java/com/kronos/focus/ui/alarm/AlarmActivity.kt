@@ -222,10 +222,17 @@ class AlarmActivity : ComponentActivity() {
                 MusicPlayer(tick)
             }
 
+            val btBlocked = remember(tick) { com.kronos.focus.services.MusicResume.bluetoothAudioConnected(this@AlarmActivity) }
+            if (btBlocked) {
+                Text(
+                    "Desconecta los audífonos o parlantes Bluetooth: la rutina solo avanza con la música sonando por el teléfono.",
+                    style = MaterialTheme.typography.titleMedium, color = Color(0xFFFFB4AB),
+                )
+            }
             current?.let { step ->
                 CtaButton("Hacerlo y tomar foto", {
                     startActivity(com.kronos.focus.ui.ProofActivity.intent(this@AlarmActivity, step, com.kronos.focus.ui.ProofActivity.KIND_ROUTINE))
-                }, Modifier.height(76.dp))
+                }, Modifier.height(76.dp), enabled = !btBlocked)
             }
         }
     }
