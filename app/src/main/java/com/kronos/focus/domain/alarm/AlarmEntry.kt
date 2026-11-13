@@ -26,8 +26,8 @@ object AlarmTimes {
     }
 
     data class Occurrence(val alarm: AlarmEntry, val epochDay: Long, val timeMs: Long) {
-        /** Identifica esta ocurrencia concreta (alarma + día) para no repetirla. */
-        val stamp: String get() = "$epochDay#${alarm.id}"
+        /** Identifica esta ocurrencia concreta (alarma + día + hora) para no repetirla. Con la hora, cambiar la hora de una alarma que ya sonó hoy no hace que se salte hoy. */
+        val stamp: String get() = "$epochDay#${alarm.id}#${alarm.minutesOfDay}"
     }
 
     private fun epochDay(c: Calendar): Long = LocalDate.of(c.get(Calendar.YEAR), c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH)).toEpochDay()

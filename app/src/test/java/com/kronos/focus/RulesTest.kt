@@ -91,6 +91,14 @@ class RulesTest {
         assertNull(AlarmTimes.next(listOf(weekdays.copy(days = 0)), cal(12, 6), null))
     }
 
+    @Test fun editingTheTimeOfAnAlarmThatAlreadyRangTodayStillRingsToday() {
+        // La alarma 1 sonó hoy a las 00:00 (siesta). A las 02:00 se edita a las 08:00: debe sonar HOY a las 08:00, no mañana.
+        val nap = AlarmEntry(1, 0, 0, AlarmTimes.ALL_DAYS, true, "Siesta")
+        val rang = AlarmTimes.next(listOf(nap), cal(12, 23, 59), null)!!   // ocurrencia del 13 a las 00:00
+        val edited = nap.copy(hour = 8)
+        assertEquals(cal(13, 8), AlarmTimes.next(listOf(edited), cal(13, 2), rang.stamp)!!.timeMs)
+    }
+
     @Test fun twoAlarmsSameDayBothRing() {
         val a = AlarmEntry(1, 7, 0, AlarmTimes.ALL_DAYS, true, "")
         val b = AlarmEntry(2, 7, 30, AlarmTimes.ALL_DAYS, true, "")
