@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Kronos Focus</string>
+    <string name="accessibility_label">Kronos Focus – Modo Búnker</string>
+    <string name="accessibility_description">Detecta la app en primer plano para bloquear distracciones durante el Modo Búnker. No lee ni almacena contenido de pantalla.</string>
+</resources>

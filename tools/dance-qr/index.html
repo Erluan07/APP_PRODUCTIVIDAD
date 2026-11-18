@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kronos · QR bailable</title>
+<link rel="icon" href="icono.png">
+<style>
+  :root { --bg:#06131a; --card:#0d2430; --ink:#e8f6f4; --muted:#8fb3b0; --accent:#2dd4bf; --warn:#fca5a5; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; background:radial-gradient(circle at 20% 0%, #0b3a3a 0, var(--bg) 55%); color:var(--ink);
+         font:16px/1.45 system-ui,Segoe UI,Roboto,sans-serif; display:flex; justify-content:center; padding:24px 16px; }
+  main { width:100%; max-width:720px; display:flex; flex-direction:column; gap:16px; }
+  h1 { margin:0; font-size:28px; } h1 .sp { display:inline-block; animation:tw 1.6s ease-in-out infinite; }
+  h1 .sp:nth-of-type(2) { animation-delay:.5s; } h1 .sp:nth-of-type(3) { animation-delay:1s; }
+  @keyframes tw { 0%,100% { opacity:.3; transform:scale(.8) rotate(0); } 50% { opacity:1; transform:scale(1.25) rotate(20deg); } }
+  .card { background:var(--card); border-radius:16px; padding:16px; display:flex; flex-direction:column; gap:12px; }
+  label { font-size:13px; color:var(--muted); display:flex; flex-direction:column; gap:4px; }
+  input { background:#071a22; color:var(--ink); border:1px solid #1f4a55; border-radius:10px; padding:10px 12px; font:inherit; }
+  button { background:var(--accent); color:#032; border:0; border-radius:12px; padding:14px 18px; font:600 17px system-ui,Segoe UI,Roboto,sans-serif; cursor:pointer; }
+  button.soft { background:#12394a; color:var(--ink); } button:disabled { opacity:.5; cursor:default; }
+  .muted { color:var(--muted); font-size:14px; } .err { color:var(--warn); }
+  .stage { position:relative; border-radius:16px; overflow:hidden; background:#000; aspect-ratio:4/3; }
+  video { width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
+  .bar { height:14px; background:#12394a; border-radius:8px; overflow:hidden; } .bar > i { display:block; height:100%; width:0; background:linear-gradient(90deg,#2dd4bf,#a7f3d0); transition:width .15s; }
+  #qrbox { background:#fff; border-radius:16px; padding:16px; display:flex; justify-content:center; } #qrbox svg { width:min(80vw,360px); height:auto; }
+  .hidden { display:none !important; } .big { font-size:48px; font-weight:700; text-align:center; }
+</style>
+</head>
+<body>
+<main>
+  <h1><span class="sp">✨</span> QR bailable <span class="sp">✨</span><span class="sp" style="font-size:20px">⭐</span></h1>
+
+  <section class="card" id="setup">
+    <p class="muted">Pulsa el botón: se abre Spotify con tu música, se enciende la cámara y, cuando llevas 30 segundos bailando, aparece el QR para apagar la alarma del teléfono.</p>
+    <label>Clave del teléfono (Kronos → Más → Sistema → QR bailable → Copiar clave)
+      <input id="key" placeholder="ABCD-EFGH-IJKL-…" autocomplete="off" spellcheck="false">
+    </label>
+    <label>Enlace de Spotify (opcional; vacío = abre la aplicación de Spotify): una playlist o canción, p. ej. spotify:playlist:… o https://open.spotify.com/…
+      <input id="spotify" placeholder="spotify:playlist:..." autocomplete="off" spellcheck="false">
+    </label>
+    <label>Segundos de baile
+      <input id="goal" type="number" min="5" max="120" value="30">
+    </label>
+    <p class="err" id="err"></p>
+    <button id="go">✨ Empezar a bailar</button>
+  </section>
+
+  <section class="card hidden" id="dance">
+    <div class="stage"><video id="vid" autoplay playsinline muted></video></div>
+    <div class="bar"><i id="fill"></i></div>
+    <div class="big" id="secs">0 / 30 s</div>
+    <p class="muted" id="hint">¡Baila! Mueve todo el cuerpo: agitar solo una mano no cuenta.</p>
+    <p class="muted">¿No se abrió Spotify? <a href="spotify:" style="color:var(--accent)">Abrir la aplicación</a> ·
+      <a href="https://open.spotify.com" target="_blank" rel="noopener" style="color:var(--accent)">Abrir en el navegador</a></p>
+    <button class="soft" id="cancel">Cancelar</button>
+  </section>
+
+  <section class="card hidden" id="done">
+    <div class="big">¡Lo lograste! 🎉</div>
+    <div id="qrbox"></div>
+    <p class="muted">Escanéalo con la pantalla de alarma del teléfono. Es nuevo cada minuto y caduca a los 3 minutos. <b id="age"></b></p>
+    <button class="soft" id="again">Bailar otra vez</button>
+  </section>
+</main>
+
+<canvas id="work" width="160" height="120" class="hidden"></canvas>
+<script src="qrcode.js"></script>
+<script src="dance-core.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var core = window.DanceCore;
+  var stream = null, timer = null, qrTimer = null, meter = null, prev = null, last = 0, secret = null;
+  var store = (function () { try { return window.localStorage; } catch (e) { return null; } })();
+
+  if (store) { $('key').value = store.getItem('kronosKey') || ''; $('spotify').value = store.getItem('kronosSpotify') || ''; $('goal').value = store.getItem('kronosGoal') || 30; }
+
+  function show(id) { ['setup', 'dance', 'done'].forEach(function (s) { $(s).classList.toggle('hidden', s !== id); }); }
+  function fail(msg) { $('err').textContent = msg; }
+
+  /** Abre Spotify. Sin enlace usa "spotify:" (abre la aplicación de escritorio). Chrome/Edge pueden preguntar "¿Abrir Spotify?": acepta. */
+  function openSpotify(link) {
+    link = (link || '').trim() || 'spotify:';
+    var a = document.createElement('a');
+    a.href = link;
+    if (/^https?:/i.test(link)) { a.target = '_blank'; a.rel = 'noopener'; }   // spotify: se abre sin pestaña nueva
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+
+  function stopCamera() {
+    if (timer) { clearInterval(timer); timer = null; }
+    if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+  }
+
+  function start() {
+    fail('');
+    secret = core.textToSecret($('key').value);
+    if (!secret || secret.length !== 20) { fail('La clave no es válida: cópiala otra vez desde Kronos (Más → Sistema → QR bailable).'); return; }
+    var goal = Math.max(5, Math.min(120, parseInt($('goal').value, 10) || 30));
+    if (store) { store.setItem('kronosKey', $('key').value.trim()); store.setItem('kronosSpotify', $('spotify').value.trim()); store.setItem('kronosGoal', String(goal)); }
+    openSpotify($('spotify').value.trim());
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { fail('Este navegador no deja usar la cámara desde un archivo. Prueba con Chrome o Edge.'); return; }
+    navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false }).then(function (s) {
+      stream = s; $('vid').srcObject = s;
+      meter = new core.DanceMeter(goal); prev = null; last = Date.now();
+      $('secs').textContent = '0 / ' + goal + ' s'; $('fill').style.width = '0';
+      show('dance');
+      timer = setInterval(tick, 100);
+    }).catch(function (e) { fail('No pude abrir la cámara: ' + (e && e.message ? e.message : e)); });
+  }
+
+  function tick() {
+    var v = $('vid'), c = $('work');
+    if (!v.videoWidth) return;
+    var ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(v, 0, 0, c.width, c.height);
+    var px = ctx.getImageData(0, 0, c.width, c.height).data, gray = new Uint8Array(c.width * c.height);
+    for (var i = 0, j = 0; i < px.length; i += 4, j++) gray[j] = (px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114) | 0;
+    var now = Date.now(), dt = now - last; last = now;
+    var res = prev ? core.analyze(prev, gray, c.width, c.height) : { active: false, cells: 0 };
+    prev = gray;
+    var done = meter.update(res.active, dt);
+    $('fill').style.width = Math.round(meter.progress() * 100) + '%';
+    $('secs').textContent = Math.floor(meter.sec) + ' / ' + meter.goal + ' s';
+    $('hint').textContent = res.active ? '¡Así! Sigue bailando 💃🕺' : 'Te veo quieto: ¡muévete más, con todo el cuerpo!';
+    if (done) finish();
+  }
+
+  function renderQr() {
+    var qr = window.qrcode(0, 'M');
+    qr.addData(core.payload(secret, Date.now())); qr.make();
+    $('qrbox').innerHTML = qr.createSvgTag({ cellSize: 8, margin: 2, scalable: true });
+  }
+
+  function finish() {
+    stopCamera(); show('done'); renderQr();
+    var t0 = Date.now();
+    qrTimer = setInterval(function () { renderQr(); $('age').textContent = 'Generado hace ' + Math.round((Date.now() - t0) / 1000) + ' s.'; }, 15000);
+  }
+
+  function reset() { stopCamera(); if (qrTimer) { clearInterval(qrTimer); qrTimer = null; } show('setup'); }
+
+  $('go').onclick = start;
+  $('cancel').onclick = reset;
+  $('again').onclick = reset;
+  window.__dance = { start: start };   // para pruebas automáticas
+})();
+</script>
+</body>
+</html>
