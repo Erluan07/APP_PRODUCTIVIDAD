@@ -35,7 +35,7 @@
     <label>Clave del teléfono (Kronos → Más → Sistema → QR bailable → Copiar clave)
       <input id="key" placeholder="ABCD-EFGH-IJKL-…" autocomplete="off" spellcheck="false">
     </label>
-    <label>Enlace de Spotify (opcional): una playlist o canción, p. ej. spotify:playlist:… o https://open.spotify.com/…
+    <label>Enlace de Spotify (opcional; vacío = abre la aplicación de Spotify): una playlist o canción, p. ej. spotify:playlist:… o https://open.spotify.com/…
       <input id="spotify" placeholder="spotify:playlist:..." autocomplete="off" spellcheck="false">
     </label>
     <label>Segundos de baile
@@ -50,6 +50,8 @@
     <div class="bar"><i id="fill"></i></div>
     <div class="big" id="secs">0 / 30 s</div>
     <p class="muted" id="hint">¡Baila! Mueve todo el cuerpo: agitar solo una mano no cuenta.</p>
+    <p class="muted">¿No se abrió Spotify? <a href="spotify:" style="color:var(--accent)">Abrir la aplicación</a> ·
+      <a href="https://open.spotify.com" target="_blank" rel="noopener" style="color:var(--accent)">Abrir en el navegador</a></p>
     <button class="soft" id="cancel">Cancelar</button>
   </section>
 
@@ -77,10 +79,12 @@
   function show(id) { ['setup', 'dance', 'done'].forEach(function (s) { $(s).classList.toggle('hidden', s !== id); }); }
   function fail(msg) { $('err').textContent = msg; }
 
+  /** Abre Spotify. Sin enlace usa "spotify:" (abre la aplicación de escritorio). Chrome/Edge pueden preguntar "¿Abrir Spotify?": acepta. */
   function openSpotify(link) {
-    if (!link) return;
+    link = (link || '').trim() || 'spotify:';
     var a = document.createElement('a');
-    a.href = link; a.target = '_blank'; a.rel = 'noopener';
+    a.href = link;
+    if (/^https?:/i.test(link)) { a.target = '_blank'; a.rel = 'noopener'; }   // spotify: se abre sin pestaña nueva
     document.body.appendChild(a); a.click(); a.remove();
   }
 

@@ -6,7 +6,8 @@ cámara del PC, comprueba que llevas 30 s moviéndote y entonces genera un QR **
 ## Uso (una vez)
 1. En el teléfono: **Más → Sistema → QR bailable → Copiar clave**.
 2. En el PC: abre `index.html` (doble clic, con Chrome o Edge), pega la clave y, si quieres, un enlace de Spotify
-   (`spotify:playlist:…` o `https://open.spotify.com/…`). Se recuerda en ese navegador.
+   (`spotify:playlist:…` o `https://open.spotify.com/…`); vacío abre la aplicación de Spotify. Se recuerda en ese navegador.
+   La primera vez Chrome/Edge preguntan "¿Abrir Spotify?": acepta (y marca "permitir siempre").
 
 ## Cada noche
 Al pulsar **Me voy a dormir** en el teléfono, elige **QR bailable ✨**. Por la mañana, con la alarma sonando:
