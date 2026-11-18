@@ -13,7 +13,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -120,6 +123,21 @@ fun SystemSection(ctx: Context, now: Long, a11y: Boolean, actions: AppActions) {
                 chosen.map { p -> runCatching { pm.getApplicationLabel(pm.getApplicationInfo(p, 0)).toString() }.getOrDefault(p) }.sorted()
             }
             MutedText(if (names.isEmpty()) "Ninguna (solo el Teléfono)." else names.joinToString(" · "))
+        }
+
+        AppCard {
+            val keyStore = com.kronos.focus.data.DanceKeyStore.get(ctx)
+            val clip = ctx.getSystemService(android.content.ClipboardManager::class.java)
+            var keyText by remember { mutableStateOf(keyStore.text()) }
+            SectionTitle("QR bailable ✨", "Clave para el programa del PC (tools/dance-qr). Cópiala una vez en el PC; el teléfono y el PC deben tener la hora automática.")
+            Text(keyText, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SoftButton("Copiar clave", {
+                    clip?.setPrimaryClip(android.content.ClipData.newPlainText("Clave QR bailable", keyText))
+                }, Modifier.weight(1f))
+                SoftButton("Clave nueva", { keyStore.renew(); keyText = keyStore.text() }, Modifier.weight(1f))
+            }
+            MutedText("Al irte a dormir eliges QR normal o bailable. Con “clave nueva” el PC deja de valer hasta que copies la nueva.")
         }
 
         AppCard {

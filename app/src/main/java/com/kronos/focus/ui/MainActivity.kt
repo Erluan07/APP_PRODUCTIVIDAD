@@ -10,6 +10,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.kronos.focus.data.TemplateStore
 import com.kronos.focus.domain.agenda.TaskImport
 import com.kronos.focus.domain.rules.AppRulesConfig
@@ -61,21 +64,11 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, "Primero crea una alarma: el Modo Dormir dura hasta que suene.", Toast.LENGTH_LONG).show()
             return
         }
-        val routine = com.kronos.focus.data.RoutineStore.get(this)
-        if (routine.steps().isEmpty()) {
-            beginSleep()
-            return
-        }
-        // Rutina de mañana: la respuesta queda fijada hasta que suene la alarma.
-        android.app.AlertDialog.Builder(this)
-            .setTitle("¿Activar la rutina de mañana?")
-            .setMessage("Al apagar la alarma suena tu música (no se puede pausar) y haces cada paso con foto de evidencia:\n\n" +
-                routine.steps().mapIndexed { i, s -> "${i + 1}. $s" }.joinToString("\n"))
-            .setPositiveButton("Sí, activar") { _, _ -> routine.armed = true; beginSleep() }
-            .setNegativeButton("No") { _, _ -> routine.armed = false; beginSleep() }
-            .setCancelable(false)
-            .show()
+        sleepDialog = true   // pregunta rutina y tipo de QR (ver setContent)
     }
+
+    /** Diálogo "Antes de dormir" visible. */
+    private var sleepDialog by mutableStateOf(false)
 
     private fun beginSleep() {
         SleepMode.begin(this)
@@ -101,6 +94,23 @@ class MainActivity : ComponentActivity() {
             requestSteps = { actLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION) },
             importModel = { modelLauncher.launch(arrayOf("*/*")) },
         )
-        setContent { KronosTheme { AppRoot(actions) } }
+        setContent {
+            KronosTheme {
+                AppRoot(actions)
+                if (sleepDialog) {
+                    val routine = com.kronos.focus.data.RoutineStore.get(this)
+                    SleepSetupDialog(
+                        steps = routine.steps(),
+                        onConfirm = { useRoutine, dance ->
+                            sleepDialog = false
+                            routine.armed = useRoutine
+                            com.kronos.focus.data.AlarmStateStore.get(this).danceArmed = dance
+                            beginSleep()
+                        },
+                        onCancel = { sleepDialog = false },
+                    )
+                }
+            }
+        }
     }
 }

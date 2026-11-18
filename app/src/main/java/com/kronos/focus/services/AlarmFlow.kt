@@ -40,8 +40,9 @@ object AlarmFlow {
                 else -> "Alarma de las $hm."
             }
             AlarmScheduler.cancelRing(ctx)
+            s.danceRequired = s.danceArmed; s.danceArmed = false   // el QR bailable vale para esta alarma y sus repeticiones
             resetMute(s)
-            s.phase = AlarmPhase.RINGING
+            s.ringStartMs = System.currentTimeMillis(); s.phase = AlarmPhase.RINGING
             AlarmScheduler.scheduleDaily(ctx) // siguiente día
         }
         AlarmService.sync(ctx)
@@ -56,7 +57,7 @@ object AlarmFlow {
         routine.armed = routine.steps().isNotEmpty()
         s.ringNote = "Prueba de la alarma."
         resetMute(s)
-        s.phase = AlarmPhase.RINGING
+        s.ringStartMs = System.currentTimeMillis(); s.phase = AlarmPhase.RINGING
         AlarmService.sync(ctx)
     }
 
@@ -76,6 +77,7 @@ object AlarmFlow {
         val s = AlarmStateStore.get(ctx)
         if (s.phase != AlarmPhase.RINGING) return
         resetMute(s)
+        s.danceRequired = false   // bailar vale para apagar la alarma una vez; si vuelve a sonar (rutina sin terminar, recaída…) basta el QR normal
         MusicResume.play(ctx) // retoma Spotify para levantarte con música
         val routine = RoutineStore.get(ctx)
         // Rutina armada al irte a dormir (o ya empezada hoy): foto de cada paso, con la música bloqueada.
@@ -116,7 +118,7 @@ object AlarmFlow {
         if (s.phase != AlarmPhase.ROUTINE) return
         resetMute(s)
         s.ringNote = "No terminaste la rutina a tiempo. Escanea otra vez y retómala donde la dejaste."
-        s.phase = AlarmPhase.RINGING
+        s.ringStartMs = System.currentTimeMillis(); s.phase = AlarmPhase.RINGING
         AlarmService.sync(ctx)
     }
 
@@ -139,7 +141,7 @@ object AlarmFlow {
     /** No completó el ritual a tiempo: vuelve la alarma completa. */
     fun escalateRitual(ctx: Context) {
         val s = AlarmStateStore.get(ctx)
-        if (s.phase == AlarmPhase.RITUAL) { resetMute(s); s.phase = AlarmPhase.RINGING }
+        if (s.phase == AlarmPhase.RITUAL) { resetMute(s); s.ringStartMs = System.currentTimeMillis(); s.phase = AlarmPhase.RINGING }
     }
 
     /** Ya no hay "¿sigues despierto?": tras la rutina/ritual solo corre el monitoreo de pasos. */
@@ -173,14 +175,14 @@ object AlarmFlow {
         if (s.phase == AlarmPhase.RINGING || s.phase == AlarmPhase.RITUAL || s.phase == AlarmPhase.ROUTINE) return
         resetMute(s)
         s.ringNote = "Parece que te volviste a la cama: no caminaste (${AppRulesConfig.AWAKE_MIN_STEPS} pasos cada ${AppRulesConfig.AWAKE_WINDOW_MIN} min). Levántate y vuelve a escanear."
-        s.phase = AlarmPhase.RINGING
+        s.ringStartMs = System.currentTimeMillis(); s.phase = AlarmPhase.RINGING
         AlarmService.sync(ctx)
     }
 
     /** No respondió a tiempo: vuelve la alarma completa. */
     fun escalate(ctx: Context) {
         val s = AlarmStateStore.get(ctx)
-        if (s.phase == AlarmPhase.CHECK_ACTIVE) { resetMute(s); s.phase = AlarmPhase.RINGING }
+        if (s.phase == AlarmPhase.CHECK_ACTIVE) { resetMute(s); s.ringStartMs = System.currentTimeMillis(); s.phase = AlarmPhase.RINGING }
     }
 
     /** Tras reinicio: reprograma todo y reanuda lo que estuviera pendiente. */

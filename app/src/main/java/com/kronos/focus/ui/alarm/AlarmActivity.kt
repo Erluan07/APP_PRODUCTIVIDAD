@@ -112,9 +112,11 @@ class AlarmActivity : ComponentActivity() {
         var muteLeft by remember { mutableLongStateOf(0L) }
         var ritualLeft by remember { mutableLongStateOf(0L) }
         var note by remember { mutableStateOf("") }
+        var danceNeeded by remember { mutableStateOf(store.danceRequired) }
         LaunchedEffect(Unit) {
             while (true) {
                 phase = store.phase
+                danceNeeded = store.danceRequired
                 note = store.ringNote
                 ritualLeft = ((store.ritualDeadlineMs - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
                 muteLeft = ((store.muteUntilMs - System.currentTimeMillis() + 999) / 1000).coerceAtLeast(0)
@@ -137,7 +139,13 @@ class AlarmActivity : ComponentActivity() {
             } else {
                 Text("¡Despierta!", style = MaterialTheme.typography.headlineLarge, color = Color.White)
                 if (note.isNotBlank()) Text(note, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f))
-                Text(
+                if (danceNeeded) {
+                    Text(
+                        "✨ QR bailable: abre el programa del PC, baila 30 s frente a la cámara y escanea el QR que te genera. El QR normal no vale.",
+                        style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.95f),
+                    )
+                    scanNote?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = Color(0xFFFFB4AB)) }
+                } else Text(
                     "Levántate y escanea el código del baño o la cocina, o acerca la etiqueta NFC.",
                     style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.92f),
                 )
@@ -468,7 +476,18 @@ class AlarmActivity : ComponentActivity() {
         }
     }
 
+    /** Mensaje cuando se escanea un QR que no vale en modo bailable (viejo, de otra clave o el normal). */
+    private var scanNote by mutableStateOf<String?>(null)
+
     private fun onCode(value: String) {
+        if (store.danceRequired) {
+            val ok = com.kronos.focus.domain.alarm.DanceQr.verify(
+                com.kronos.focus.data.DanceKeyStore.get(this).secret(), value, System.currentTimeMillis(), store.ringStartMs,
+            )
+            if (ok) { scanNote = null; AlarmFlow.scanSuccess(this) }
+            else scanNote = "Ese QR no vale: tiene que ser el bailable, recién generado por el PC (caduca en 3 min) y con la misma clave."
+            return
+        }
         if (value.trim() == AppRulesConfig.ALARM_QR_VALUE) AlarmFlow.scanSuccess(this)
     }
 
@@ -515,7 +534,7 @@ class AlarmActivity : ComponentActivity() {
         visible = true
         NfcAdapter.getDefaultAdapter(this)?.enableReaderMode(
             this,
-            { tag -> if (nfcMatches(tag)) runOnUiThread { AlarmFlow.scanSuccess(this) } },
+            { tag -> if (!store.danceRequired && nfcMatches(tag)) runOnUiThread { AlarmFlow.scanSuccess(this) } },
             NfcAdapter.FLAG_READER_NFC_A or NfcAdapter.FLAG_READER_NFC_B or NfcAdapter.FLAG_READER_NFC_F or
                 NfcAdapter.FLAG_READER_NFC_V or NfcAdapter.FLAG_READER_NO_PLATFORM_SOUNDS,
             null

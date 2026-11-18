@@ -30,6 +30,21 @@ class AlarmStateStore private constructor(private val prefs: SharedPreferences) 
         get() = prefs.getLong("routine_deadline", 0L)
         set(v) { prefs.edit().putLong("routine_deadline", v).apply() }
 
+    /** Cuándo empezó a sonar la alarma por última vez (el QR bailable tiene que ser posterior). */
+    var ringStartMs: Long
+        get() = prefs.getLong("ring_start", 0L)
+        set(v) { prefs.edit().putLong("ring_start", v).apply() }
+
+    /** Elegido al irte a dormir: la próxima alarma se apaga con el QR bailable en vez del normal. */
+    var danceArmed: Boolean
+        get() = prefs.getBoolean("dance_armed", false)
+        set(v) { prefs.edit().putBoolean("dance_armed", v).apply() }
+
+    /** La alarma que está sonando (y sus repeticiones por recaída) exige el QR bailable. */
+    var danceRequired: Boolean
+        get() = prefs.getBoolean("dance_required", false)
+        set(v) { prefs.edit().putBoolean("dance_required", v).apply() }
+
     /** Hasta cuándo está silenciada la alarma (botón "voy a escanear"). */
     var muteUntilMs: Long
         get() = prefs.getLong("mute_until", 0L)

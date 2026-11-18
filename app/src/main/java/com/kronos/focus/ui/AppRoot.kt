@@ -59,7 +59,8 @@ fun AppRoot(actions: AppActions) {
     // (Antes, un bucle dormido en una pausa larga dejaba el cronómetro congelado hasta cambiar de pestaña.)
     // OJO: `remember` siempre se llama (nunca dentro de un && / ||); si no, al cambiar de pestaña Compose desalinea sus posiciones y falla.
     val bunkerActive = remember(now) { store.isActive(now) }
-    val countdown = tab == 0 && (bunkerActive || com.kronos.focus.services.AwakeStatus.active)
+    val timeRunning = remember(now) { com.kronos.focus.data.TimeTrackerStore.get(ctx).running() != null }
+    val countdown = (tab == 0 && (bunkerActive || com.kronos.focus.services.AwakeStatus.active)) || (tab == 2 && timeRunning)
     LaunchedEffect(lifecycle, countdown) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             while (true) {

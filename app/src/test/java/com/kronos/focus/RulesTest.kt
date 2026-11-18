@@ -17,6 +17,8 @@ import com.kronos.focus.domain.rules.AppRulesConfig
 import com.kronos.focus.domain.rules.UninstallGuard
 import com.kronos.focus.domain.alarm.AlarmEntry
 import com.kronos.focus.domain.alarm.AlarmTimes
+import com.kronos.focus.domain.alarm.DanceQr
+import com.kronos.focus.domain.time.TimeSpans
 import org.junit.Assert.*
 import org.junit.Test
 import java.util.Calendar
@@ -97,6 +99,46 @@ class RulesTest {
         val rang = AlarmTimes.next(listOf(nap), cal(12, 23, 59), null)!!   // ocurrencia del 13 a las 00:00
         val edited = nap.copy(hour = 8)
         assertEquals(cal(13, 8), AlarmTimes.next(listOf(edited), cal(13, 2), rang.stamp)!!.timeMs)
+    }
+
+    // ---- Contador de tiempos ----
+    @Test fun timeSpanIsSplitAtMidnight() {
+        val utc = java.time.ZoneId.of("UTC")
+        val day = java.time.LocalDate.of(2026, 11, 18)
+        val start = day.atTime(23, 0).atZone(utc).toInstant().toEpochMilli()
+        val end = day.plusDays(1).atTime(1, 30).atZone(utc).toInstant().toEpochMilli()
+        val parts = TimeSpans.split(start, end, utc)
+        assertEquals(2, parts.size)
+        assertEquals(day.toEpochDay(), parts[0].epochDay); assertEquals(3_600_000L, parts[0].ms)
+        assertEquals(day.toEpochDay() + 1, parts[1].epochDay); assertEquals(5_400_000L, parts[1].ms)
+        assertTrue(TimeSpans.split(end, start, utc).isEmpty())
+        assertEquals("3:05", TimeSpans.fmt(3 * 3_600_000L + 5 * 60_000L + 9_000L))
+        assertEquals("3:05:09", TimeSpans.fmt(3 * 3_600_000L + 5 * 60_000L + 9_000L, seconds = true))
+    }
+
+    // ---- QR bailable ----
+    private val danceSecret = ByteArray(20) { it.toByte() }
+
+    @Test fun danceQrMatchesTheSharedTestVector() {
+        // Mismo vector que tools/dance-qr/test.mjs: si cambia uno, tienen que cambiar los dos.
+        assertEquals("AAAQ-EAYE-AUDA-OCAJ-BIFQ-YDIO-B4IB-CEQT", DanceQr.secretToText(danceSecret))
+        assertEquals("87659411df99", DanceQr.mac(danceSecret, 29_000_000L))
+        assertEquals("KRONOSD1|29000000|87659411df99", DanceQr.payload(danceSecret, 29_000_000L * 60_000L + 5_000L))
+        assertArrayEquals(danceSecret, DanceQr.textToSecret("aaaq eayE-AUDA-OCAJ-BIFQ-YDIO-B4IB-CEQT"))
+    }
+
+    @Test fun danceQrExpiresAndCannotBePreGenerated() {
+        val t = 29_000_000L * 60_000L
+        val code = DanceQr.payload(danceSecret, t)
+        val ring = t - 30_000L                                       // la alarma empezó medio minuto antes
+        assertTrue(DanceQr.verify(danceSecret, code, t + 10_000L, ring))
+        assertTrue(DanceQr.verify(danceSecret, code, t + 3 * 60_000L, ring))     // aún dentro de la ventana
+        assertFalse(DanceQr.verify(danceSecret, code, t + 5 * 60_000L, ring))    // captura vieja: caducó
+        assertFalse(DanceQr.verify(danceSecret, code, t + 10_000L, t + 60_000L)) // generado antes de que sonara
+        assertFalse(DanceQr.verify(danceSecret, code.dropLast(1) + "0", t, ring))   // mac alterado
+        assertFalse(DanceQr.verify(ByteArray(20) { 9 }, code, t, ring))          // otra clave
+        assertFalse(DanceQr.verify(danceSecret, "KRONOS-BANO-01", t, ring))      // el QR normal no vale en modo bailable
+        assertFalse(DanceQr.verify(null, code, t, ring))
     }
 
     @Test fun twoAlarmsSameDayBothRing() {

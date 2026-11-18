@@ -53,7 +53,7 @@ object TestMode {
         runCatching { app.getSystemService(NotificationManager::class.java).cancel(NOTIF_ID) }
         val s = AlarmStateStore.get(app)
         s.phase = AlarmPhase.IDLE
-        s.muteUntilMs = 0L; s.muteUses = 0; s.routineDeadlineMs = 0L; s.ritualDeadlineMs = 0L; s.ringNote = ""
+        s.danceArmed = false; s.danceRequired = false; s.muteUntilMs = 0L; s.muteUses = 0; s.routineDeadlineMs = 0L; s.ritualDeadlineMs = 0L; s.ringNote = ""
         RoutineStore.get(app).reset()
         BunkerStateStore.get(app).forceEnd()
         AgendaStore.get(app).resetDayForTest()

@@ -140,7 +140,7 @@ object AppRulesConfig {
 
     // ---- Parámetros de comportamiento ----
     /** Tiempo máximo para terminar la rutina de la mañana; si no, vuelve a sonar la alarma completa. */
-    const val ROUTINE_TIMEOUT_MIN = 60L
+    const val ROUTINE_TIMEOUT_MIN = 15L
     /** Durante la rutina la música no se puede pausar y el volumen queda fijo en esta fracción del máximo (1 = máximo). */
     const val ROUTINE_MIN_VOLUME = 1.0f
     const val WAKE_CHECK_MIN_DELAY_MIN = 7

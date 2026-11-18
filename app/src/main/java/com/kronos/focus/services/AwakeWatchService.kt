@@ -52,7 +52,7 @@ class AwakeWatchService : Service(), SensorEventListener {
         override fun run() {
             val now = System.currentTimeMillis()
             if (AlarmStateStore.get(this@AwakeWatchService).phase == AlarmPhase.RINGING) { stopSelf(); return } // ya está sonando
-            if (now >= endMs) { stopSelf(); return }
+            if (now >= endMs) { AlarmStateStore.get(this@AwakeWatchService).danceRequired = false; stopSelf(); return }
             if (!stepMode && moves >= AppRulesConfig.AWAKE_MOVE_COUNT) { steps += 5; publish() }
             moves = 0
             evaluateGoal(now)
